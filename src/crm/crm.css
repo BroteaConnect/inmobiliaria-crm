@@ -63,6 +63,34 @@ button { font: inherit; cursor: pointer; }
   display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; }
 .alta .fila { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
 
+/* --- seguimiento de contactos --- */
+.lead.desatendido { border-left: 3px solid var(--warn); }
+.lead .seguimiento { align-self: start; background: none; border: 0; padding: 0;
+  color: var(--muted); font-size: .78rem; text-decoration: underline dotted; }
+.lead.desatendido .seguimiento { color: var(--warn); font-weight: 700; }
+.historial { list-style: none; margin: 2px 0; padding: var(--space-2);
+  background: var(--bg); border-radius: var(--radius); font-size: .78rem;
+  display: flex; flex-direction: column; gap: 5px; }
+.historial li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.historial .cuando { color: var(--muted); }
+.historial .asunto { color: var(--muted); font-style: italic; flex-basis: 100%; }
+.historial .vacio { color: var(--muted); }
+.envio { font-weight: 700; }
+.envio-abierto, .envio-click { color: var(--ok); }
+.envio-error { color: var(--danger); }
+.lead .acciones .enlace { background: none; border: 0; padding: 0;
+  color: var(--primary); font-size: .85rem; }
+
+.compositor { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: var(--space-4);
+  margin-bottom: var(--space-4); display: flex; flex-direction: column;
+  gap: var(--space-3); max-width: 620px; }
+.compositor h2 { font-size: 1.05rem; margin: 0; }
+.compositor .dest { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.compositor .botones { display: flex; gap: var(--space-3); }
+.compositor .botones button:not(.primario) { background: none; color: var(--muted);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem 1rem; }
+
 .aviso { border-radius: var(--radius); padding: var(--space-3); margin: var(--space-3) 0 0; font-weight: 600; }
 .aviso-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
 .aviso-error { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
