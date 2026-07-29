@@ -34,6 +34,7 @@ export const anotar = (leadId: string, tipo: string, nota: string) =>
   create('actividades', { lead: leadId, tipo, nota });
 
 export const crearPropietario = (data: Partial<Propietario>) => create<Propietario>('propietarios', data);
+export const crearLead = (data: Partial<Lead>) => create<Lead>('leads', data);
 export const crearPropiedad = (data: FormData | object) => create<Propiedad>('propiedades', data);
 export const actualizarPropiedad = (id: string, data: FormData | object) => update<Propiedad>('propiedades', id, data);
 
