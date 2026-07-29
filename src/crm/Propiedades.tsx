@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios,
-  crearPropiedad, actualizarPropiedad, fotoUrl,
+  crearPropiedad, actualizarPropiedad, fotoUrl, normalizaFoto,
 } from './api';
 
 const eur = (n: number) => n?.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) ?? '—';
@@ -10,22 +10,57 @@ export default function Propiedades() {
   const [props, setProps] = useState<Propiedad[]>([]);
   const [owners, setOwners] = useState<Propietario[]>([]);
   const [alta, setAlta] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
   const recargar = () => { loadPropiedades().then(setProps); loadPropietarios().then(setOwners); };
   useEffect(recargar, []);
 
   const publicar = async (p: Propiedad) => {
-    await actualizarPropiedad(p.id, { estado: p.estado === 'publicada' ? 'borrador' : 'publicada' });
-    recargar();
+    try {
+      await actualizarPropiedad(p.id, { estado: p.estado === 'publicada' ? 'borrador' : 'publicada' });
+      recargar();
+    } catch (err) {
+      setMsg({ tipo: 'error', texto: `No se pudo cambiar el estado: ${(err as Error).message}` });
+    }
   };
 
   const crear = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    if (!fd.get('estado')) fd.set('estado', 'borrador');
-    await crearPropiedad(fd);
-    setAlta(false);
-    recargar();
+    const form = e.currentTarget;
+    const raw = new FormData(form);
+    setMsg(null);
+    try {
+      // Payload explícito: solo campos con valor (un multipart con partes
+      // vacías es justo lo que hacía tropezar al backend).
+      const texto = (k: string) => String(raw.get(k) ?? '').trim();
+      const num = (k: string) => (texto(k) === '' ? undefined : Number(texto(k)));
+      const payload: Record<string, unknown> = { titulo: texto('titulo'), estado: 'borrador' };
+      for (const k of ['municipio', 'direccion', 'descripcion', 'propietario'] as const) {
+        if (texto(k)) payload[k] = texto(k);
+      }
+      for (const k of ['precio', 'habitaciones', 'banos', 'superficie'] as const) {
+        const v = num(k);
+        if (v !== undefined && !Number.isNaN(v)) payload[k] = v;
+      }
+
+      const brutas = (raw.getAll('fotos') as File[]).filter((f) => f && f.size > 0);
+      if (brutas.length === 0) {
+        await crearPropiedad(payload); // sin fotos → JSON puro, sin multipart
+      } else {
+        setMsg({ tipo: 'ok', texto: 'Preparando fotos…' });
+        const fotos = await Promise.all(brutas.map(normalizaFoto));
+        const fd = new FormData();
+        for (const [k, v] of Object.entries(payload)) fd.append(k, String(v));
+        for (const f of fotos) fd.append('fotos', f, f.name);
+        await crearPropiedad(fd);
+      }
+      form.reset();
+      setAlta(false);
+      setMsg({ tipo: 'ok', texto: `"${payload.titulo}" guardada en borrador — revísala y publícala.` });
+      recargar();
+    } catch (err) {
+      setMsg({ tipo: 'error', texto: `No se pudo guardar: ${(err as Error).message}` });
+    }
   };
 
   return (
@@ -34,6 +69,7 @@ export default function Propiedades() {
         <h1>Propiedades</h1>
         <button className="primario" onClick={() => setAlta(!alta)}>{alta ? 'Cancelar' : '+ Nueva propiedad'}</button>
       </div>
+      {msg && <p role="status" className={`aviso aviso-${msg.tipo}`}>{msg.texto}</p>}
 
       {alta && (
         <form className="alta" onSubmit={crear}>
