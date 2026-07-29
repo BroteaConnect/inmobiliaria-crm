@@ -1,0 +1,32 @@
+{
+  "schema": 2,
+  "composer": "0.4.0",
+  "stack": "react",
+  "features": {
+    "analytics": {
+      "version": "1.0.0",
+      "services": [
+        "umami"
+      ]
+    },
+    "error-tracking": {
+      "version": "1.0.1",
+      "services": [
+        "glitchtip"
+      ]
+    },
+    "db": {
+      "version": "1.0.0",
+      "services": [
+        "pocketbase"
+      ]
+    }
+  },
+  "theme": {
+    "name": "brotea",
+    "version": "2.0.0"
+  },
+  "service_slugs": {
+    "pocketbase": "inmobiliaria"
+  }
+}
