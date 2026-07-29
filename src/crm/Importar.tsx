@@ -37,7 +37,7 @@ const CAMPOS = [
   ['Propiedad · proyecto', 'proyecto'], ['Propiedad · edificio', 'edificio'],
   ['Propiedad · unidad/nº', 'unidad'], ['Propiedad · dirección', 'direccion'],
   ['Propiedad · precio/valor', 'precio'], ['Propiedad · habitaciones', 'habitaciones'],
-  ['Propiedad · baños', 'banos'], ['Propiedad · superficie', 'superficie'],
+  ['Propiedad · baños', 'banos'], ['Propiedad · superficie (sqft→m²)', 'superficie'],
   ['Propiedad · descripción', 'descripcion'],
   ['Transacción · fecha', 't_fecha'], ['Transacción · procedimiento', 't_proc'],
 ] as const;
@@ -75,6 +75,13 @@ const numero = (v: string) => {
   const limpio = v.replace(/[^\d.,-]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.');
   const n = Number(limpio);
   return Number.isFinite(n) && n !== 0 ? n : undefined;
+};
+
+// El registro de la clienta trae Size en pies cuadrados → guardamos m².
+const SQFT_A_M2 = 0.092903;
+const superficieM2 = (v: string) => {
+  const n = numero(v);
+  return n === undefined ? undefined : Math.round(n * SQFT_A_M2);
 };
 
 export default function Importar() {
@@ -150,7 +157,7 @@ export default function Importar() {
           precio: numero(val('precio')),
           habitaciones: numero(val('habitaciones')),
           banos: numero(val('banos')),
-          superficie: numero(val('superficie')),
+          superficie: superficieM2(val('superficie')),
           descripcion: [val('descripcion'), contexto].filter(Boolean).join(' — ') || undefined,
           estado: 'borrador',
           propietario: owner || undefined,
