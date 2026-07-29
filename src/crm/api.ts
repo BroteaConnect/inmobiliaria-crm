@@ -21,10 +21,20 @@ export interface Propiedad {
 export interface Lead {
   id: string; nombre: string; telefono: string; email: string; mensaje: string;
   propiedad: string; etapa: Etapa; origen: string; created: string;
+  ultimo_contacto?: string;
   expand?: { propiedad?: Propiedad };
 }
 
 export interface Propietario { id: string; nombre: string; telefono: string; email: string; notas: string }
+
+export type Canal = 'nota' | 'llamada' | 'email' | 'whatsapp' | 'visita';
+export type EstadoEnvio = 'registrado' | 'enviado' | 'entregado' | 'abierto' | 'click' | 'error';
+
+export interface Actividad {
+  id: string; lead: string; tipo: Canal; nota: string; created: string;
+  direccion?: 'saliente' | 'entrante'; asunto?: string;
+  estado_envio?: EstadoEnvio; mensaje_id?: string;
+}
 
 export const loadLeads = () =>
   list<Lead>('leads', { sort: '-created', perPage: '200', expand: 'propiedad' }).then((r) => r.items);
@@ -37,8 +47,58 @@ export const loadPropietarios = () =>
 
 export const moverLead = (id: string, etapa: Etapa) => update<Lead>('leads', id, { etapa });
 
-export const anotar = (leadId: string, tipo: string, nota: string) =>
-  create('actividades', { lead: leadId, tipo, nota });
+// Toda interacción con un lead pasa por aquí: crea la actividad y sella
+// leads.ultimo_contacto, que es lo que la UI (y el futuro recordatorio
+// automático de 48 h) usa para saber quién está desatendido.
+export async function registrarContacto(
+  leadId: string,
+  tipo: Canal,
+  nota: string,
+  extra: Partial<Actividad> = {},
+) {
+  const act = await create<Actividad>('actividades', {
+    lead: leadId, tipo, nota,
+    direccion: extra.direccion ?? 'saliente',
+    estado_envio: extra.estado_envio ?? 'registrado',
+    ...extra,
+  });
+  if (tipo !== 'nota') {
+    await update<Lead>('leads', leadId, { ultimo_contacto: new Date().toISOString() });
+  }
+  return act;
+}
+
+/** Nota manual: no cuenta como contacto con el cliente. */
+export const anotar = (leadId: string, nota: string) => registrarContacto(leadId, 'nota', nota);
+
+export const loadActividades = (leadId: string) =>
+  list<Actividad>('actividades', { filter: `lead="${leadId}"`, sort: '-created', perPage: '50' })
+    .then((r) => r.items);
+
+export const ETIQUETA_CANAL: Record<Canal, string> = {
+  nota: '📝 Nota', llamada: '📞 Llamada', email: '✉️ Email',
+  whatsapp: '💬 WhatsApp', visita: '🏠 Visita',
+};
+
+export const ETIQUETA_ENVIO: Partial<Record<EstadoEnvio, string>> = {
+  enviado: 'enviado', entregado: 'entregado', abierto: 'abierto ✓',
+  click: 'clicó el enlace ✓', error: 'no se pudo entregar',
+};
+
+/** "hace 3 días" — para el dato que más se mira en el kanban. */
+export function haceCuanto(iso?: string): string {
+  if (!iso) return 'sin contactar';
+  const dias = Math.floor((Date.now() - new Date(iso.replace(' ', 'T')).getTime()) / 86400000);
+  if (dias <= 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  if (dias < 30) return `hace ${dias} días`;
+  return `hace ${Math.floor(dias / 30)} meses`;
+}
+
+/** Un lead sin contacto en 2+ días necesita atención (regla del negocio). */
+export const desatendido = (l: Lead) =>
+  !['vendido', 'nutriendo'].includes(l.etapa) &&
+  (!l.ultimo_contacto || Date.now() - new Date(l.ultimo_contacto.replace(' ', 'T')).getTime() > 2 * 86400000);
 
 export const crearPropietario = (data: Partial<Propietario>) => create<Propietario>('propietarios', data);
 export const crearLead = (data: Partial<Lead>) => create<Lead>('leads', data);
@@ -72,6 +132,28 @@ export async function normalizaFoto(f: File): Promise<File> {
   const blob = await new Promise<Blob>((res, rej) =>
     canvas.toBlob((b) => (b ? res(b) : rej(new Error(`"${f.name}": no se pudo convertir a JPEG.`))), 'image/jpeg', 0.85));
   return new File([blob], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+}
+
+// El envío real lo hace el chasis (las credenciales SMTP nunca llegan al
+// navegador); aquí solo pedimos el envío y él registra la actividad.
+const OUTBOUND_URL = 'https://api.brotea.dev/send-email';
+
+export async function enviarEmail(lead: Lead, asunto: string, texto: string) {
+  const secret = import.meta.env.PUBLIC_OUTBOUND_SECRET as string | undefined;
+  if (!secret) throw new Error('el envío de email no está configurado en esta app');
+  const res = await fetch(`${OUTBOUND_URL}?secret=${encodeURIComponent(secret)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: lead.email, subject: asunto, text: texto,
+      lead_id: lead.id, from_name: 'Inmobiliaria',
+    }),
+  });
+  if (!res.ok) {
+    const detalle = await res.json().catch(() => ({}));
+    throw new Error(detalle.detail || detalle.error || `error ${res.status}`);
+  }
+  return res.json() as Promise<{ message_id: string; activity_id: string | null }>;
 }
 
 export const waLink = (l: Lead) => {
