@@ -42,6 +42,30 @@ export const fotoUrl = (p: Propiedad, thumb = true) =>
 
 export const onLeadsChange = (cb: () => void) => subscribe(['leads/*'], cb);
 
+// Fotos reales de móvil: HEIC (iPhone) no está en la whitelist del backend y
+// las fotos suelen superar los 5 MB. Re-codificamos en cliente a JPEG
+// (máx. 2000 px) todo lo que no sea directamente aceptable.
+const MIME_OK = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+const FOTO_MAX = 4.5 * 1024 * 1024;
+
+export async function normalizaFoto(f: File): Promise<File> {
+  if (MIME_OK.includes(f.type) && f.size <= FOTO_MAX) return f;
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(f);
+  } catch {
+    throw new Error(`"${f.name}": este navegador no puede procesar ese formato de imagen — usa JPG, PNG o WebP.`);
+  }
+  const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * scale);
+  canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob>((res, rej) =>
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error(`"${f.name}": no se pudo convertir a JPEG.`))), 'image/jpeg', 0.85));
+  return new File([blob], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+}
+
 export const waLink = (l: Lead) => {
   const tel = (l.telefono || '').replace(/[^\d+]/g, '');
   const txt = encodeURIComponent(`Hola ${l.nombre}, soy tu agente inmobiliaria. Gracias por tu interés${l.expand?.propiedad ? ` en "${l.expand.propiedad.titulo}"` : ''} — ¿cuándo te viene bien hablar?`);

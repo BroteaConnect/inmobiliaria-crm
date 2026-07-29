@@ -63,6 +63,10 @@ button { font: inherit; cursor: pointer; }
   display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; }
 .alta .fila { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
 
+.aviso { border-radius: var(--radius); padding: var(--space-3); margin: var(--space-3) 0 0; font-weight: 600; }
+.aviso-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.aviso-error { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+
 /* --- importar --- */
 .importar .ayuda { color: var(--muted); max-width: 60ch; }
 .mapa { overflow-x: auto; margin-top: var(--space-4); background: var(--surface);
