@@ -1,6 +1,13 @@
 // api.ts — typed helpers over the factory's PocketBase client for this CRM.
 import { list, create, update, fileUrl, subscribe } from '../lib/pb';
 
+// Los datos de la clienta operan en dirhams (AED); un único sitio para
+// cambiar de mercado en el futuro.
+export const fmtPrecio = (n: number) =>
+  n != null && Number.isFinite(n)
+    ? `${n.toLocaleString('es-ES', { maximumFractionDigits: 0 })} AED`
+    : '—';
+
 export const ETAPAS = ['nuevo', 'contactado', 'visita', 'oferta', 'reservado', 'vendido', 'nutriendo'] as const;
 export type Etapa = (typeof ETAPAS)[number];
 

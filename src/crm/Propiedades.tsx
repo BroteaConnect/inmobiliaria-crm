@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios,
-  crearPropiedad, actualizarPropiedad, fotoUrl, normalizaFoto,
+  crearPropiedad, actualizarPropiedad, fotoUrl, normalizaFoto, fmtPrecio,
 } from './api';
-
-const eur = (n: number) => n?.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) ?? '—';
 
 export default function Propiedades() {
   const [props, setProps] = useState<Propiedad[]>([]);
@@ -101,7 +99,7 @@ export default function Propiedades() {
             <div className="cuerpo">
               <strong>{p.titulo}</strong>
               <span className="meta">{p.municipio} · {p.habitaciones ?? '–'} hab · {p.superficie ?? '–'} m²</span>
-              <span className="precio">{eur(p.precio)}</span>
+              <span className="precio">{fmtPrecio(p.precio)}</span>
               <span className={`estado estado-${p.estado}`}>{p.estado}</span>
               {(p.estado === 'borrador' || p.estado === 'publicada') && (
                 <button onClick={() => publicar(p)}>
