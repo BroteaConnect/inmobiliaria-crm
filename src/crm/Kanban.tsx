@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ETAPAS, ETIQUETA_CANAL, ETIQUETA_ENVIO, type Actividad, type Etapa, type Lead, type Propiedad,
   anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
@@ -37,10 +37,20 @@ export default function Kanban() {
     recargar();
   };
 
+  // Ref del lead abierto: descarta respuestas de cargas que llegan tarde,
+  // para que el panel nunca muestre el historial de otro lead.
+  const abiertoRef = useRef<string | null>(null);
+  const abrir = (id: string | null) => { abiertoRef.current = id; setAbierto(id); };
+  const cargarHistorial = async (id: string) => {
+    const acts = await loadActividades(id).catch(() => []);
+    if (abiertoRef.current === id) setHistorial(acts);
+  };
+
   const verHistorial = async (l: Lead) => {
-    if (abierto === l.id) { setAbierto(null); return; }
-    setAbierto(l.id);
-    setHistorial(await loadActividades(l.id));
+    if (abierto === l.id) { abrir(null); return; }
+    setHistorial([]);
+    abrir(l.id);
+    await cargarHistorial(l.id);
   };
 
   // Registramos el contacto que la agente inicia; abrir la app la hace el <a>.
@@ -48,7 +58,7 @@ export default function Kanban() {
     await registrarContacto(l.id, canal,
       canal === 'whatsapp' ? 'Mensaje de WhatsApp enviado' : 'Llamada realizada');
     recargar();
-    if (abierto === l.id) setHistorial(await loadActividades(l.id));
+    if (abierto === l.id) await cargarHistorial(l.id);
   };
 
   const mover = async (l: Lead, dir: 1 | -1) => {
@@ -61,9 +71,17 @@ export default function Kanban() {
   const guardarNota = async (l: Lead) => {
     const texto = nota[l.id]?.trim();
     if (!texto) return;
-    await anotar(l.id, texto);
+    try {
+      await anotar(l.id, texto);
+    } catch {
+      setAviso(`No se pudo guardar la nota de ${l.nombre}. Vuelve a intentarlo.`);
+      return;
+    }
     setNota((n) => ({ ...n, [l.id]: '' }));
-    if (abierto === l.id) setHistorial(await loadActividades(l.id));
+    // Cargamos antes de abrir para no enseñar el historial de otro lead.
+    const acts = await loadActividades(l.id).catch(() => []);
+    abrir(l.id);
+    setHistorial(acts);
   };
 
   const mandarEmail = async () => {
@@ -126,7 +144,7 @@ export default function Kanban() {
                   {!l.prioridad && <span className="sin" title="Sin prioridad">—</span>}
                 </div>
                 {l.expand?.propiedad && <span className="prop">🏠 {l.expand.propiedad.titulo}</span>}
-                <button className="seguimiento" onClick={() => verHistorial(l)} title="Ver historial de contactos">
+                <button className="seguimiento" onClick={() => verHistorial(l)} title="Ver historial y notas">
                   {desatendido(l) ? '⚠ ' : ''}{haceCuanto(l.ultimo_contacto)}
                 </button>
                 {l.mensaje && <p className="msg">“{l.mensaje}”</p>}
@@ -142,6 +160,7 @@ export default function Kanban() {
                           <span className={`envio envio-${a.estado_envio}`}>{ETIQUETA_ENVIO[a.estado_envio]}</span>
                         )}
                         {a.asunto && <span className="asunto">{a.asunto}</span>}
+                        {a.nota && <span className="texto">{a.nota}</span>}
                       </li>
                     ))}
                   </ul>

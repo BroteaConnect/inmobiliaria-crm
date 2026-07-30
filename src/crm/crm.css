@@ -169,6 +169,8 @@ select:focus-visible, textarea:focus-visible {
 .historial li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .historial .cuando { color: var(--muted); }
 .historial .asunto { color: var(--muted); font-style: italic; flex-basis: 100%; }
+.historial .texto { flex-basis: 100%; color: var(--text, inherit); white-space: pre-wrap;
+  overflow-wrap: anywhere; }
 .historial .vacio { color: var(--muted); }
 .envio { font-weight: 700; }
 .envio-abierto, .envio-click { color: var(--ok); }
