@@ -22,6 +22,7 @@ export interface Lead {
   id: string; nombre: string; telefono: string; email: string; mensaje: string;
   propiedad: string; etapa: Etapa; origen: string; created: string;
   ultimo_contacto?: string; criterios?: string;
+  prioridad?: number; // 1–5; sin valor = sin prioridad
   expand?: { propiedad?: Propiedad };
 }
 
@@ -46,6 +47,40 @@ export const loadPropietarios = () =>
   list<Propietario>('propietarios', { sort: 'nombre', perPage: '200' }).then((r) => r.items);
 
 export const moverLead = (id: string, etapa: Etapa) => update<Lead>('leads', id, { etapa });
+
+/** Prioridad 1–5; null la quita (el campo queda sin valor en el backend). */
+export const setPrioridad = (id: string, n: number | null) =>
+  update<Lead>('leads', id, { prioridad: n });
+
+/** Orden dentro de cada columna: 5 primero, sin prioridad al final; a igual prioridad, el más reciente antes. */
+export const porPrioridad = (a: Lead, b: Lead) =>
+  (b.prioridad ?? 0) - (a.prioridad ?? 0) || b.created.localeCompare(a.created);
+
+/** Pliega acentos y mayúsculas ("Málaga" → "malaga") para buscar en cliente. */
+const plegar = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Búsqueda de leads en cliente sobre nombre, email, teléfono y mensaje. */
+export const coincideLead = (l: Lead, q: string) => {
+  const t = plegar(q.trim());
+  if (!t) return true;
+  return [l.nombre, l.email, l.telefono, l.mensaje].some((c) => c && plegar(c).includes(t));
+};
+
+// Búsqueda de propiedades en servidor con el filtro `~` (contains) de
+// PocketBase — aislada aquí para poder sustituirla por Meilisearch más
+// adelante sin tocar la UI. Ojo: `~` ignora mayúsculas pero NO pliega
+// acentos ("Malaga" ≠ "Málaga" en el servidor).
+export const buscarPropiedades = (q: string) => {
+  // Las barras invertidas se eliminan (no se escapan): el parser de filtros
+  // de PocketBase no garantiza `\\` como par completo y un 400 dejaría la
+  // rejilla colgada; ningún texto inmobiliario real las necesita.
+  const seguro = q.replace(/\\/g, '').replace(/"/g, '\\"');
+  const filtro = ['titulo', 'municipio', 'direccion', 'descripcion']
+    .map((campo) => `${campo} ~ "${seguro}"`).join(' || ');
+  return list<Propiedad>('propiedades', { filter: filtro, sort: '-created', perPage: '200' })
+    .then((r) => r.items);
+};
 
 // Toda interacción con un lead pasa por aquí: crea la actividad y sella
 // leads.ultimo_contacto, que es lo que la UI (y el futuro recordatorio

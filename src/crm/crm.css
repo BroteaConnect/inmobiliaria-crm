@@ -55,6 +55,12 @@ select:focus-visible, textarea:focus-visible {
   gap: var(--space-4); flex-wrap: wrap; }
 .barra h1 { font-size: 1.5rem; margin: 0; }
 
+/* --- filtros del kanban --- */
+.filtros { display: flex; gap: var(--space-3); flex-wrap: wrap;
+  margin-bottom: var(--space-4); }
+.filtros select { max-width: min(320px, 100%); min-height: 44px; }
+.filtros input { flex: 1; min-width: min(240px, 100%); min-height: 44px; }
+
 /* --- kanban --- */
 .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr);
   gap: var(--space-3); overflow-x: auto; padding-bottom: var(--space-4); align-items: start; }
@@ -70,6 +76,18 @@ select:focus-visible, textarea:focus-visible {
   transition: border-color .18s ease, box-shadow .18s ease; }
 .lead:hover { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
 .lead .prop { color: var(--muted); font-size: .8rem; }
+/* Prioridad 1–5: puntitos compactos para que la card siga entrando a 360 px. */
+.lead .prioridad { display: flex; align-items: center; gap: 6px; }
+.lead .prioridad button { width: 32px; height: 32px; padding: 0; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--muted);
+  font-size: .75rem; font-weight: 700; line-height: 1; position: relative;
+  transition: border-color .15s ease, color .15s ease, background .15s ease; }
+/* Zona táctil ampliada (~44px) sin engordar el punto visual: cliente móvil. */
+.lead .prioridad button::after { content: ''; position: absolute; inset: -6px; border-radius: 999px; }
+.lead .prioridad button:hover { border-color: var(--primary); color: var(--primary); }
+.lead .prioridad button.activa { background: var(--primary);
+  color: var(--primary-contrast); border-color: var(--primary); }
+.lead .prioridad .sin { color: var(--muted); font-size: .8rem; margin-left: 2px; }
 .lead .msg { color: var(--muted); font-style: italic; margin: 0; font-size: .85rem; }
 .lead .acciones { display: flex; gap: var(--space-3); }
 .lead .acciones a { text-decoration: none; color: var(--primary); font-size: .85rem; }
@@ -82,6 +100,9 @@ select:focus-visible, textarea:focus-visible {
 .lead .notas input { width: 100%; font-size: .85rem; padding: .35rem .5rem; }
 
 /* --- propiedades --- */
+.barra .buscador { flex: 1; min-width: min(240px, 100%); min-height: 44px; }
+.sin-resultados { color: var(--muted); margin: var(--space-4) 0 0; }
+
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--space-4); margin-top: var(--space-4); }
 .ficha { background: var(--surface); border: 1px solid var(--border);
