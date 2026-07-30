@@ -118,6 +118,25 @@ select:focus-visible, textarea:focus-visible {
   transition: color .15s ease, border-color .15s ease; }
 .alta .acciones button:not(.primario):hover { color: var(--text); border-color: var(--muted); }
 
+/* --- fotos: contador en la card + tira de miniaturas al editar --- */
+.portada { position: relative; }
+.n-fotos { position: absolute; right: var(--space-2); bottom: var(--space-2);
+  background: rgba(9, 9, 45, 0.65); color: #fff; font-size: .78rem; font-weight: 700;
+  border-radius: 999px; padding: 3px 10px; pointer-events: none; }
+.fotos-actuales { display: flex; flex-direction: column; gap: var(--space-2); }
+.tira-fotos { list-style: none; margin: 0; padding: 0; display: flex;
+  gap: var(--space-2); overflow-x: auto; }
+.tira-fotos li { position: relative; flex: 0 0 auto; }
+.tira-fotos img { width: 132px; height: 88px; object-fit: cover; display: block;
+  border-radius: var(--radius); border: 1px solid var(--border); }
+.quitar-foto { position: absolute; top: 0; right: 0; width: 44px; height: 44px;
+  border: 0; padding: 0; display: grid; place-items: center;
+  background: rgba(9, 9, 45, 0.55); color: #fff; font-size: .95rem; line-height: 1;
+  border-radius: 0 var(--radius) 0 var(--radius);
+  transition: background .15s ease; }
+.quitar-foto:not(:disabled):hover { background: var(--danger); }
+.quitar-foto:disabled { opacity: .35; cursor: default; }
+
 /* --- seguimiento de contactos --- */
 .lead.desatendido { border-left: 3px solid var(--warn); }
 .lead .seguimiento { align-self: start; background: none; border: 0; padding: 0;
