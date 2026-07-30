@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios,
-  crearPropiedad, actualizarPropiedad, fotoUrl, normalizaFoto, fmtPrecio,
+  crearPropiedad, actualizarPropiedad, fotoUrl, fotosUrls, quitarFoto, normalizaFoto, fmtPrecio,
 } from './api';
 
 export default function Propiedades() {
@@ -9,6 +9,7 @@ export default function Propiedades() {
   const [owners, setOwners] = useState<Propietario[]>([]);
   const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
   const [enviando, setEnviando] = useState(false);
+  const [borrando, setBorrando] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -34,9 +35,31 @@ export default function Propiedades() {
     }
   };
 
+  // Borrar una foto es un PATCH inmediato ('fotos-') e irreversible: PocketBase
+  // elimina el fichero del disco, de ahí el confirm. El form sigue abierto y la
+  // tira se refresca con el record que devuelve el PATCH (misma key → los
+  // campos a medio editar no se pierden).
+  const borrarFoto = async (p: Propiedad, nombre: string) => {
+    if (borrando) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
+    if (!confirm('¿Eliminar esta foto? El borrado es permanente.')) return;
+    setMsg(null);
+    setBorrando(nombre);
+    try {
+      const actualizada = await quitarFoto(p.id, nombre);
+      // Solo si esa propiedad sigue abierta: si mientras llegaba la respuesta
+      // se cerró el form o se abrió otra, no hay que reabrirlo ni pisarla.
+      setForm((f) => (typeof f === 'object' && f.id === actualizada.id ? actualizada : f));
+      recargar();
+    } catch (err) {
+      setMsg({ tipo: 'error', texto: `No se pudo eliminar la foto: ${(err as Error).message}` });
+    } finally {
+      setBorrando(null);
+    }
+  };
+
   const guardar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (enviando) return; // doble submit: en edición duplicaría las fotos ('fotos+')
+    if (enviando || borrando) return; // doble submit duplicaría fotos ('fotos+'); con un borrado en vuelo, dos PATCH tocarían el mismo record
     const el = e.currentTarget;
     const raw = new FormData(el);
     setMsg(null);
@@ -145,11 +168,37 @@ export default function Propiedades() {
               {owners.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
             </select>
           </label>
+          {editando && (
+            <div className="fotos-actuales">
+              <span className="pista">
+                {editando.fotos?.length
+                  ? `${editando.fotos.length} ${editando.fotos.length === 1 ? 'foto' : 'fotos'}`
+                  : 'Sin fotos todavía.'}
+              </span>
+              {(editando.fotos?.length ?? 0) > 0 && (
+                <ul className="tira-fotos">
+                  {editando.fotos.map((nombre, i) => (
+                    <li key={nombre}>
+                      <img src={fotosUrls(editando)[i]} alt={`Foto ${i + 1} de "${editando.titulo}"`} loading="lazy" />
+                      <button
+                        type="button"
+                        className="quitar-foto"
+                        disabled={enviando || borrando !== null}
+                        aria-label={`Eliminar foto ${i + 1}`}
+                        title="Eliminar foto"
+                        onClick={() => borrarFoto(editando, nombre)}
+                      >✕</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <label>Fotos <input name="fotos" type="file" accept="image/*" multiple />
             {editando && <span className="pista">Las fotos nuevas se añaden a las existentes.</span>}
           </label>
           <div className="acciones">
-            <button className="primario" type="submit" disabled={enviando}>
+            <button className="primario" type="submit" disabled={enviando || borrando !== null}>
               {enviando ? 'Guardando…' : 'Guardar'}
             </button>
             <button type="button" disabled={enviando} onClick={() => setForm('cerrado')}>Cancelar</button>
@@ -160,7 +209,17 @@ export default function Propiedades() {
       <div className="grid">
         {props.map((p) => (
           <article key={p.id} className="ficha">
-            {fotoUrl(p) ? <img src={fotoUrl(p)} alt="" /> : <div className="sinfoto">📷</div>}
+            {fotoUrl(p) ? (
+              <div className="portada">
+                <img src={fotoUrl(p)} alt="" />
+                {/* La portada (fotos[0]) no cambia al añadir fotos ('fotos+'
+                    las pone al final); el contador sí, y es el feedback de
+                    que la subida funcionó. */}
+                <span className="n-fotos" title={`${p.fotos.length} ${p.fotos.length === 1 ? 'foto' : 'fotos'}`}>
+                  📷 {p.fotos.length}
+                </span>
+              </div>
+            ) : <div className="sinfoto">📷</div>}
             <div className="cuerpo">
               <strong>{p.titulo}</strong>
               <span className="meta">{p.municipio} · {p.habitaciones ?? '–'} hab · {p.superficie ?? '–'} m²</span>

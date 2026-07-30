@@ -105,8 +105,17 @@ export const crearLead = (data: Partial<Lead>) => create<Lead>('leads', data);
 export const crearPropiedad = (data: FormData | object) => create<Propiedad>('propiedades', data);
 export const actualizarPropiedad = (id: string, data: FormData | object) => update<Propiedad>('propiedades', id, data);
 
+/** Portada: la primera foto (la que enseñan las cards). */
 export const fotoUrl = (p: Propiedad, thumb = true) =>
   p.fotos?.length ? fileUrl(p, p.fotos[0]) + (thumb ? '?thumb=600x400' : '') : '';
+
+/** Todas las fotos de la propiedad, en el orden del backend. */
+export const fotosUrls = (p: Propiedad, thumb = true): string[] =>
+  (p.fotos ?? []).map((f) => fileUrl(p, f) + (thumb ? '?thumb=600x400' : ''));
+
+/** Quita UNA foto ('fotos-', sintaxis PocketBase). El borrado del fichero es permanente. */
+export const quitarFoto = (id: string, filename: string) =>
+  actualizarPropiedad(id, { 'fotos-': [filename] });
 
 export const onLeadsChange = (cb: () => void) => subscribe(['leads/*'], cb);
 
