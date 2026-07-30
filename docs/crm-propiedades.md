@@ -13,6 +13,7 @@ PocketBase. Scope: this repo only — the public catalog that consumes
 | Create | `+ Nueva propiedad` → form → Guardar | `crearPropiedad` (POST) | always `borrador` |
 | Publish / unpublish | card toggle (shown only for `borrador`/`publicada`) | `actualizarPropiedad(id, { estado })` | `publicada` ↔ `borrador` |
 | Edit | `Editar` button on every card (any estado) | `actualizarPropiedad(id, payload)` (PATCH) | unchanged — edit never sends `estado` |
+| Delete photo | `✕` on a thumbnail in the edit form (confirm-gated) | `quitarFoto(id, filename)` (PATCH `fotos-`) | unchanged |
 
 Publishing is instant on the public site (it reads client-side with the
 `estado="publicada"` filter; no rebuild).
@@ -36,7 +37,9 @@ that record. Mechanics:
   down the grid).
 - Submit is double-click-guarded (`enviando` state disables both buttons and
   bails out early) — a double submit in edit mode would duplicate photos via
-  `fotos+`.
+  `fotos+`. The guard also bails while a photo deletion is in flight
+  (`borrando`): two concurrent PATCHes on the same record could land out of
+  order.
 
 ### PATCH payload semantics
 
@@ -74,8 +77,66 @@ fd.append('@jsonPayload', JSON.stringify(payload)); // '' and null preserved
 for (const f of fotos) fd.append('fotos+', f, f.name); // append, not replace
 ```
 
-Deleting individual photos is **not supported** from this form; the UI says
-so next to the file input ("Las fotos nuevas se añaden a las existentes").
+The file input still carries the hint "Las fotos nuevas se añaden a las
+existentes" in edit mode.
+
+Photo URL helpers in `api.ts`:
+
+| Helper | Returns / effect |
+|---|---|
+| `fotoUrl(p, thumb = true)` | cover URL — always `fotos[0]` (`?thumb=600x400` unless `thumb: false`), `''` if no photos |
+| `fotosUrls(p, thumb = true)` | array with **every** photo URL, in backend order |
+| `quitarFoto(id, filename)` | PATCH `{ 'fotos-': [filename] }`; resolves to the updated record — file deletion is permanent |
+
+### Current photos in the edit form
+
+Edit mode renders a `.fotos-actuales` block between the propietario select
+and the file input: a visible count ("4 fotos", or "Sin fotos todavía") plus
+a horizontally scrollable thumbnail strip (`.tira-fotos`) of every current
+photo via `fotosUrls(editando)` — `600x400` thumbs, lazy-loaded, backend
+order. This is the upload feedback the form used to lack: new files are
+appended at the **end** of `fotos`, so after saving they show up at the end
+of the strip.
+
+### Deleting a photo
+
+Each thumbnail overlays a `✕` button (`.quitar-foto`, 44×44px touch target)
+that removes exactly that photo. Mechanics:
+
+- **Confirm-gated**: PocketBase deletes the file from disk permanently, so
+  the click first asks `confirm('¿Eliminar esta foto? El borrado es
+  permanente.')`.
+- The call is `quitarFoto(id, filename)` — an immediate JSON PATCH using
+  PocketBase's `fotos-` modifier (the mirror of `fotos+`), equivalent to:
+
+```bash
+curl -X PATCH "$PB/api/collections/propiedades/records/$ID" \
+  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"fotos-": ["cocina_ab12cd34.jpg"]}'
+```
+
+- **One deletion at a time**: `borrando` holds the in-flight filename; every
+  `✕` and the `Guardar` button are disabled meanwhile (and both `borrarFoto`
+  and submit bail out early) — two concurrent PATCHes on the same record
+  could land out of order.
+- **Refresh without losing edits**: on success the open form is updated with
+  the record the PATCH returns, but **only if that same property is still
+  open** (`setForm((f) => typeof f === 'object' && f.id === actualizada.id ?
+  actualizada : f)`) — if the form was closed or another record opened while
+  the response was in flight, it is left alone. The form key doesn't change,
+  so the uncontrolled inputs keep any half-edited values; the card grid is
+  refreshed via `recargar()`.
+- Errors surface in the standard `.aviso-error` banner
+  ("No se pudo eliminar la foto: …").
+
+## Photo-count badge on cards
+
+Every card cover (wrapped in `.portada`) overlays a `.n-fotos` badge
+("📷 4"). It exists because the cover always renders `fotos[0]` while new
+photos are appended at the end — the cover pixels never change after an
+upload, so the incrementing count is the visible proof that it worked. The
+badge is `pointer-events: none` and only rendered when the property has
+photos (`.sinfoto` placeholder otherwise).
 
 ## Form layout (`.alta` in crm.css)
 
@@ -86,7 +147,15 @@ so next to the file input ("Las fotos nuevas se añaden a las existentes").
 - `.fila`: existing 4-column grid for the numeric row (precio/hab/baños/m²).
 - `.acciones`: flex row with `Guardar` (`.primario`, shows "Guardando…"
   while submitting) and a secondary `Cancelar` button that closes the form.
-- `.pista`: muted helper text (used for the photo-append note in edit mode).
+- `.pista`: muted helper text (used for the photo count and the
+  photo-append note in edit mode).
+- `.fotos-actuales` / `.tira-fotos`: edit-mode block with the photo count
+  and a horizontally scrollable strip of 132×88 thumbnails; each `<li>` is
+  `position: relative` so `.quitar-foto` (44×44px, top-right, danger
+  background on hover, dimmed when disabled) can overlay its image.
+- Card-side companions (outside `.alta`): `.portada` wraps the cover image
+  with `position: relative` and `.n-fotos` is the pill badge pinned to its
+  bottom-right corner.
 
 Mobile collapses (desktop untouched, everything behind media queries):
 
