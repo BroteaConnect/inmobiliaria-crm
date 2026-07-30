@@ -1,8 +1,8 @@
 # CRM — /propiedades view
 
 How the CRM's properties page (`src/crm/Propiedades.tsx` + `src/crm/crm.css`)
-lists, creates, publishes and edits `propiedades` records in the shared
-PocketBase. Scope: this repo only — the public catalog that consumes
+lists, searches, creates, publishes and edits `propiedades` records in the
+shared PocketBase. Scope: this repo only — the public catalog that consumes
 `estado="publicada"` records is documented in the reference repo
 (`BroteaConnect/inmobiliaria`).
 
@@ -17,6 +17,47 @@ PocketBase. Scope: this repo only — the public catalog that consumes
 
 Publishing is instant on the public site (it reads client-side with the
 `estado="publicada"` filter; no rebuild).
+
+## Search
+
+The `.barra` header carries a search input (`.buscador`, ~44px touch
+target). Behavior by query length (after `trim()`):
+
+| Query | What happens |
+|---|---|
+| < 2 chars | full grid via `loadPropiedades()` (latest 200, no debounce) |
+| ≥ 2 chars | **server-side** search via `buscarPropiedades(q)`, debounced 300 ms |
+
+`buscarPropiedades` (in `api.ts`) builds a PocketBase `~` (contains) filter
+over `titulo`, `municipio`, `direccion` and `descripcion`, OR-joined —
+equivalent to:
+
+```bash
+curl -G "$PB/api/collections/propiedades/records" -H "Authorization: $TOKEN" \
+  --data-urlencode 'filter=titulo ~ "marina" || municipio ~ "marina" || direccion ~ "marina" || descripcion ~ "marina"' \
+  --data-urlencode 'sort=-created' --data-urlencode 'perPage=200'
+```
+
+Details that matter:
+
+- **Case-insensitive, but no accent folding**: PocketBase `~` ignores case
+  yet `"Malaga"` does **not** match `"Málaga"` on the server (unlike the
+  Kanban's client-side lead search, which folds accents).
+- **Input sanitization**: double quotes are escaped; backslashes are
+  *stripped*, not escaped — the PocketBase filter parser doesn't guarantee
+  `\\` as a pair and a 400 would leave the grid stale.
+- **Stale-response guards**: `busquedaRef` holds the current query; a
+  response is only applied if its query is still the one typed. The
+  non-debounced full reload is guarded too (it could otherwise arrive after
+  a later search and overwrite its results).
+- **Errors** surface in the standard message banner ("No se pudo
+  buscar: …"); an empty result set renders `.sin-resultados`
+  ("Sin resultados para «q».").
+- **Reloads respect the search**: `recargar()` (after create/edit/photo
+  changes) re-runs the active search instead of resetting the grid.
+- **Backend seam**: the query is isolated in `buscarPropiedades()` so the
+  search backend can be swapped (e.g. for Meilisearch) without touching the
+  UI. Today it is PocketBase `~` only — Meilisearch is **not** integrated.
 
 ## Edit flow
 
