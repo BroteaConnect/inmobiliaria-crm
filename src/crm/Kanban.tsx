@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  ETAPAS, ETIQUETA_CANAL, ETIQUETA_ENVIO, type Actividad, type Etapa, type Lead,
-  anotar, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
-  moverLead, onLeadsChange, registrarContacto, waLink,
+  ETAPAS, ETIQUETA_CANAL, ETIQUETA_ENVIO, type Actividad, type Etapa, type Lead, type Propiedad,
+  anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
+  loadPropiedades, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
 
 const TITULOS: Record<Etapa, string> = {
@@ -17,9 +17,25 @@ export default function Kanban() {
   const [historial, setHistorial] = useState<Actividad[]>([]);
   const [email, setEmail] = useState<{ lead: Lead; asunto: string; texto: string } | null>(null);
   const [aviso, setAviso] = useState('');
+  // Filtros en estado propio (no derivados de los datos): la recarga por SSE
+  // reemplaza `leads` sin tocar lo que la agente tiene seleccionado/escrito.
+  const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
+  const [filtroProp, setFiltroProp] = useState(''); // '' = todas, 'sin' = sin propiedad, o id
+  const [busqueda, setBusqueda] = useState('');
 
   const recargar = () => loadLeads().then(setLeads).catch(() => {});
   useEffect(() => { recargar(); return onLeadsChange(recargar); }, []);
+  useEffect(() => { loadPropiedades().then(setPropiedades).catch(() => {}); }, []);
+
+  // El filtrado es 100% en cliente sobre la ventana que ya trae loadLeads.
+  const visibles = leads.filter((l) =>
+    (filtroProp === '' || (filtroProp === 'sin' ? !l.propiedad : l.propiedad === filtroProp)) &&
+    coincideLead(l, busqueda));
+
+  const cambiarPrioridad = async (l: Lead, n: number) => {
+    await setPrioridad(l.id, l.prioridad === n ? null : n); // repetir el valor la quita
+    recargar();
+  };
 
   const verHistorial = async (l: Lead) => {
     if (abierto === l.id) { setAbierto(null); return; }
@@ -83,13 +99,32 @@ export default function Kanban() {
         </div>
       )}
 
+      <div className="filtros">
+        <select value={filtroProp} onChange={(e) => setFiltroProp(e.target.value)} aria-label="Filtrar por propiedad">
+          <option value="">Todas las propiedades</option>
+          <option value="sin">Sin propiedad</option>
+          {propiedades.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)}
+        </select>
+        <input type="search" placeholder="Buscar lead (nombre, email, teléfono…)" value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar lead" />
+      </div>
+
       <div className="kanban">
         {ETAPAS.map((etapa) => (
           <section key={etapa} className={`col col-${etapa}`}>
-            <h2>{TITULOS[etapa]} <span className="n">{leads.filter((l) => l.etapa === etapa).length}</span></h2>
-            {leads.filter((l) => l.etapa === etapa).map((l) => (
+            <h2>{TITULOS[etapa]} <span className="n">{visibles.filter((l) => l.etapa === etapa).length}</span></h2>
+            {visibles.filter((l) => l.etapa === etapa).sort(porPrioridad).map((l) => (
               <article key={l.id} className={`lead${desatendido(l) ? ' desatendido' : ''}`}>
                 <strong>{l.nombre}</strong>
+                <div className="prioridad" role="group" aria-label={`Prioridad de ${l.nombre}`}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} className={l.prioridad === n ? 'activa' : ''}
+                      aria-pressed={l.prioridad === n}
+                      title={l.prioridad === n ? 'Quitar prioridad' : `Prioridad ${n}`}
+                      onClick={() => cambiarPrioridad(l, n)}>{n}</button>
+                  ))}
+                  {!l.prioridad && <span className="sin" title="Sin prioridad">—</span>}
+                </div>
                 {l.expand?.propiedad && <span className="prop">🏠 {l.expand.propiedad.titulo}</span>}
                 <button className="seguimiento" onClick={() => verHistorial(l)} title="Ver historial de contactos">
                   {desatendido(l) ? '⚠ ' : ''}{haceCuanto(l.ultimo_contacto)}

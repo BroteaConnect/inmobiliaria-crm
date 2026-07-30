@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  type Propiedad, type Propietario, loadPropiedades, loadPropietarios,
+  type Propiedad, type Propietario, loadPropiedades, loadPropietarios, buscarPropiedades,
   crearPropiedad, actualizarPropiedad, fotoUrl, fotosUrls, quitarFoto, normalizaFoto, fmtPrecio,
 } from './api';
 
@@ -11,12 +11,45 @@ export default function Propiedades() {
   const [enviando, setEnviando] = useState(false);
   const [borrando, setBorrando] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [busqueda, setBusqueda] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+  // La consulta vigente, para descartar respuestas obsoletas de búsquedas
+  // anteriores que lleguen desordenadas.
+  const busquedaRef = useRef('');
+  busquedaRef.current = busqueda.trim();
 
   const editando = typeof form === 'object' ? form : null;
 
-  const recargar = () => { loadPropiedades().then(setProps); loadPropietarios().then(setOwners); };
-  useEffect(recargar, []);
+  const recargar = () => {
+    const q = busquedaRef.current;
+    (q.length >= 2 ? buscarPropiedades(q) : loadPropiedades())
+      .then(setProps)
+      .catch((err) => setMsg({ tipo: 'error', texto: `No se pudieron recargar las propiedades: ${(err as Error).message}` }));
+    loadPropietarios().then(setOwners);
+  };
+  useEffect(() => { loadPropietarios().then(setOwners); }, []);
+
+  // Búsqueda: con 2+ caracteres consulta al servidor (debounce de 300 ms);
+  // con menos, vuelve a la rejilla completa (y carga la inicial al montar).
+  useEffect(() => {
+    const q = busqueda.trim();
+    const fallo = (err: Error) =>
+      setMsg({ tipo: 'error', texto: `No se pudo buscar: ${err.message}` });
+    if (q.length < 2) {
+      // También con guarda de obsolescencia: esta carga sin debounce puede
+      // llegar después que una búsqueda posterior y pisar sus resultados.
+      loadPropiedades()
+        .then((items) => { if (busquedaRef.current.length < 2) setProps(items); })
+        .catch(fallo);
+      return;
+    }
+    const t = setTimeout(() => {
+      buscarPropiedades(q)
+        .then((items) => { if (busquedaRef.current === q) setProps(items); })
+        .catch(fallo);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda]);
 
   // Al abrir en modo edición, lleva el formulario a la vista (la card
   // pulsada puede estar muy abajo en la rejilla).
@@ -133,6 +166,8 @@ export default function Propiedades() {
     <div>
       <div className="barra">
         <h1>Propiedades</h1>
+        <input type="search" className="buscador" placeholder="Buscar por título, municipio, dirección…"
+          value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar propiedad" />
         <button className="primario" onClick={() => setForm(form === 'cerrado' ? 'nueva' : 'cerrado')}>
           {form === 'cerrado' ? '+ Nueva propiedad' : 'Cancelar'}
         </button>
@@ -204,6 +239,10 @@ export default function Propiedades() {
             <button type="button" disabled={enviando} onClick={() => setForm('cerrado')}>Cancelar</button>
           </div>
         </form>
+      )}
+
+      {busqueda.trim().length >= 2 && props.length === 0 && (
+        <p className="sin-resultados">Sin resultados para «{busqueda.trim()}».</p>
       )}
 
       <div className="grid">
