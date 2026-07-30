@@ -2,9 +2,9 @@
 
 How the CRM's lead board (`src/crm/Kanban.tsx` + `src/crm/api.ts` +
 `src/crm/crm.css`) filters and prioritizes `leads` records in the shared
-PocketBase. This page covers the filter bar and the 1–5 priority; contact
-logging, email sending and the unattended (⚠) rule live in the code
-comments in `api.ts`.
+PocketBase. This page covers the filter bar, the 1–5 priority and the
+per-card history panel with notes; email sending and the unattended (⚠)
+rule live in the code comments in `api.ts`.
 
 ## Board basics
 
@@ -59,3 +59,42 @@ curl -X PATCH "$PB/api/collections/leads/records/$ID" \
 - UI: 32px round dots whose `::after` overlay expands the touch target to
   ~44px (mobile clients); active state and colors use theme tokens
   (`--primary`, `--primary-contrast`, `--border`).
+
+## History panel & notes (`.historial`)
+
+Each card has a history toggle — the "hace X días" label, with
+`title="Ver historial y notas"` — that opens a panel listing the lead's
+activities from the `actividades` collection, **newest first, latest 50**.
+
+Activities are plain PocketBase records; a note is just
+`tipo='nota'` with the text in the `nota` field:
+
+```bash
+curl -X POST "$PB/api/collections/actividades/records" \
+  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"lead": "'$LEAD_ID'", "tipo": "nota", "nota": "Prefiere visita el sábado"}'
+```
+
+- **Note text is rendered in the list**: each `<li>` shows the activity
+  subject and, when present, the `nota` field
+  (`{a.nota && <span className="texto">{a.nota}</span>}`). The text is
+  escaped by React — no HTML or markdown rendering. Call/WhatsApp
+  activities carry boilerplate `nota` text ("Llamada realizada", "Mensaje
+  de WhatsApp enviado"), which is shown too.
+- **Adding a note**: type in the card's "Añadir nota…" input and press
+  Enter. On success the draft is cleared, activities are reloaded and the
+  history panel opens automatically showing the fresh note. On failure a
+  warning is shown ("No se pudo guardar la nota de <nombre>…") and the
+  draft text is **kept** so nothing is lost.
+- **Stale-response guard**: an `abiertoRef` tracks which lead's panel is
+  open; every activity load is checked against it before painting, so a
+  late response can never render another lead's history. Opening a panel
+  first clears any stale list, then loads.
+- Logging a call/WhatsApp contact while the panel is open reloads the
+  history through the same guarded loader.
+- CSS: `.historial .texto` takes the full row (`flex-basis: 100%`) and
+  wraps long notes inside the narrow card (`white-space: pre-wrap`,
+  `overflow-wrap: anywhere`).
+
+No schema change was needed for this: notes were always stored in
+`actividades.nota`; previously saved notes simply become visible.
