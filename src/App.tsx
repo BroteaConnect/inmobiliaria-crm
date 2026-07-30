@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { isLoggedIn, logout } from './lib/pb';
 import { features } from './features/registry';
 import Login from './crm/Login';
@@ -7,19 +7,41 @@ import Kanban from './crm/Kanban';
 import Propiedades from './crm/Propiedades';
 import Importar from './crm/Importar';
 
-const navStyle = {
-  display: 'flex',
-  gap: 'var(--space-4)',
-  padding: 'var(--space-4)',
-  borderBottom: '1px solid var(--border)',
-  background: 'var(--surface)',
-  alignItems: 'center',
-} as const;
-const mainStyle = {
-  maxWidth: '1200px',
-  margin: '0 auto',
-  padding: 'var(--space-5) var(--space-4)',
-} as const;
+function Nav({ onLogout }: { onLogout: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  const cerrar = () => setMenuOpen(false);
+
+  return (
+    <nav className="topnav">
+      <strong className="marca">CRM Inmobiliaria</strong>
+      <button
+        type="button"
+        className="menu-btn"
+        aria-label="Menú"
+        aria-expanded={menuOpen}
+        aria-controls="nav-links"
+        onClick={() => setMenuOpen((o) => !o)}
+      >
+        <span /><span /><span />
+      </button>
+      <div id="nav-links" className={`links${menuOpen ? ' abierto' : ''}`}>
+        <NavLink to="/" end onClick={cerrar}>Leads</NavLink>
+        <NavLink to="/propiedades" onClick={cerrar}>Propiedades</NavLink>
+        <NavLink to="/importar" onClick={cerrar}>Importar</NavLink>
+        {features.map((f) => (
+          <NavLink key={f.path} to={f.path} onClick={cerrar}>{f.label}</NavLink>
+        ))}
+        <a className="externo" href="https://inmobiliaria.brotea.dev" target="_blank"
+          rel="noreferrer" onClick={cerrar}>Ver web pública ↗</a>
+        <button type="button" className="salir" onClick={onLogout}>Salir</button>
+      </div>
+    </nav>
+  );
+}
 
 export default function App() {
   const [logged, setLogged] = useState(isLoggedIn());
@@ -28,23 +50,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <nav style={navStyle}>
-        <strong style={{ fontFamily: 'var(--font-display)' }}>CRM Inmobiliaria</strong>
-        <NavLink to="/">Leads</NavLink>
-        <NavLink to="/propiedades">Propiedades</NavLink>
-        <NavLink to="/importar">Importar</NavLink>
-        {features.map((f) => (
-          <NavLink key={f.path} to={f.path}>{f.label}</NavLink>
-        ))}
-        <a href="https://inmobiliaria.brotea.dev" target="_blank" rel="noreferrer"
-          style={{ marginLeft: 'auto', fontSize: '.85rem' }}>Ver web pública ↗</a>
-        <button onClick={() => { logout(); setLogged(false); }}
-          style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                   color: 'var(--muted)', padding: '4px 12px', font: 'inherit', cursor: 'pointer' }}>
-          Salir
-        </button>
-      </nav>
-      <main style={mainStyle}>
+      <Nav onLogout={() => { logout(); setLogged(false); }} />
+      <main className="contenido">
         <Routes>
           <Route path="/" element={<Kanban />} />
           <Route path="/propiedades" element={<Propiedades />} />

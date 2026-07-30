@@ -21,7 +21,7 @@ export interface Propiedad {
 export interface Lead {
   id: string; nombre: string; telefono: string; email: string; mensaje: string;
   propiedad: string; etapa: Etapa; origen: string; created: string;
-  ultimo_contacto?: string;
+  ultimo_contacto?: string; criterios?: string;
   expand?: { propiedad?: Propiedad };
 }
 
