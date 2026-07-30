@@ -106,8 +106,17 @@ select:focus-visible, textarea:focus-visible {
   color: var(--text); border-radius: var(--radius); padding: .35rem; font-size: .85rem; }
 .alta { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: var(--space-4); margin-top: var(--space-4);
-  display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; }
+  display: flex; flex-direction: column; gap: var(--space-3); max-width: 720px; }
+.alta h2 { font-size: 1.05rem; margin: 0; }
 .alta .fila { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.alta .fila2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+.alta .fila2 label:first-child { grid-column: 1 / -1; } /* Título a todo el ancho */
+.alta .pista { color: var(--muted); font-weight: 400; font-size: .8rem; }
+.alta .acciones { display: flex; gap: var(--space-3); }
+.alta .acciones button:not(.primario) { background: none; color: var(--muted);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: .55rem 1.3rem;
+  transition: color .15s ease, border-color .15s ease; }
+.alta .acciones button:not(.primario):hover { color: var(--text); border-color: var(--muted); }
 
 /* --- seguimiento de contactos --- */
 .lead.desatendido { border-left: 3px solid var(--warn); }
@@ -168,6 +177,7 @@ select:focus-visible, textarea:focus-visible {
   .topnav .salir { margin-top: var(--space-2); min-height: 44px; }
 
   .alta .fila { grid-template-columns: repeat(2, 1fr); }
+  .alta .fila2 { grid-template-columns: 1fr; }
   .kanban { grid-auto-columns: minmax(min(280px, 84vw), 1fr);
     scroll-snap-type: x proximity; }
   .kanban .col { scroll-snap-align: start; }
@@ -175,6 +185,8 @@ select:focus-visible, textarea:focus-visible {
 
 @media (max-width: 479.98px) {
   .alta .fila { grid-template-columns: 1fr; }
+  .alta .fila2 { grid-template-columns: 1fr; }
+  .alta .acciones { flex-direction: column; align-items: stretch; }
 }
 
 @keyframes despliegue {
