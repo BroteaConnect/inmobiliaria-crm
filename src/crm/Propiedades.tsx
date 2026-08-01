@@ -1,3 +1,4 @@
+import { useI18n } from '../lib/LocaleContext';
 import { useEffect, useRef, useState } from 'react';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios, buscarPropiedades,
@@ -5,6 +6,9 @@ import {
 } from './api';
 
 export default function Propiedades() {
+  // Solo el idioma para los formateadores; el copy de esta pantalla se traduce
+  // en el siguiente paso.
+  const { locale } = useI18n();
   const [props, setProps] = useState<Propiedad[]>([]);
   const [owners, setOwners] = useState<Propietario[]>([]);
   const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
@@ -262,7 +266,7 @@ export default function Propiedades() {
             <div className="cuerpo">
               <strong>{p.titulo}</strong>
               <span className="meta">{p.municipio} · {p.habitaciones ?? '–'} hab · {p.superficie ?? '–'} m²</span>
-              <span className="precio">{fmtPrecio(p.precio)}</span>
+              <span className="precio">{fmtPrecio(locale, p.precio)}</span>
               <span className={`estado estado-${p.estado}`}>{p.estado}</span>
               {(p.estado === 'borrador' || p.estado === 'publicada') && (
                 <button onClick={() => publicar(p)}>

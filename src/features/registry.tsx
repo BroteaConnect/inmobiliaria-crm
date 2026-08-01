@@ -3,7 +3,8 @@ import type { ReactElement } from 'react';
 
 export type Feature = {
   path: string;
-  label: string;
+  /** clave i18n de la etiqueta del nav */
+  labelKey: string;
   element: ReactElement;
 };
 
