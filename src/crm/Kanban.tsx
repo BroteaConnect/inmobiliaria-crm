@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../lib/LocaleContext';
 import {
-  ETAPAS, ETIQUETA_CANAL, ETIQUETA_ENVIO, type Actividad, type Etapa, type Lead, type Propiedad,
+  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Lead, type Propiedad,
   anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
   loadPropiedades, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
 
-const TITULOS: Record<Etapa, string> = {
-  nuevo: 'Nuevos', contactado: 'Contactados', visita: 'Visita', oferta: 'Oferta',
-  reservado: 'Reservados', vendido: 'Vendidos', nutriendo: 'En cartera',
-};
-
 export default function Kanban() {
+  const { locale, t } = useI18n();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [nota, setNota] = useState<Record<string, string>>({});
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -56,7 +53,7 @@ export default function Kanban() {
   // Registramos el contacto que la agente inicia; abrir la app la hace el <a>.
   const contactar = async (l: Lead, canal: 'llamada' | 'whatsapp') => {
     await registrarContacto(l.id, canal,
-      canal === 'whatsapp' ? 'Mensaje de WhatsApp enviado' : 'Llamada realizada');
+      canal === 'whatsapp' ? t('contacto.whatsapp') : t('contacto.llamada'));
     recargar();
     if (abierto === l.id) await cargarHistorial(l.id);
   };
@@ -74,7 +71,7 @@ export default function Kanban() {
     try {
       await anotar(l.id, texto);
     } catch {
-      setAviso(`No se pudo guardar la nota de ${l.nombre}. Vuelve a intentarlo.`);
+      setAviso(t('lead.notaError', { nombre: l.nombre }));
       return;
     }
     setNota((n) => ({ ...n, [l.id]: '' }));
@@ -86,14 +83,14 @@ export default function Kanban() {
 
   const mandarEmail = async () => {
     if (!email) return;
-    setAviso('Enviando email…');
+    setAviso(t('email.enviando'));
     try {
       await enviarEmail(email.lead, email.asunto, email.texto);
-      setAviso(`Email enviado a ${email.lead.nombre}. El seguimiento (entregado / abierto) aparecerá en su historial.`);
+      setAviso(t('email.enviado', { nombre: email.lead.nombre }));
       setEmail(null);
       recargar();
     } catch (err) {
-      setAviso(`No se pudo enviar: ${(err as Error).message}`);
+      setAviso(t('email.error', { error: (err as Error).message }));
     }
   };
 
@@ -103,61 +100,61 @@ export default function Kanban() {
 
       {email && (
         <div className="compositor">
-          <h2>Email a {email.lead.nombre} <span className="dest">&lt;{email.lead.email}&gt;</span></h2>
-          <label>Asunto
+          <h2>{t('email.titulo', { nombre: email.lead.nombre })} <span className="dest">&lt;{email.lead.email}&gt;</span></h2>
+          <label>{t('email.asunto')}
             <input value={email.asunto} onChange={(e) => setEmail({ ...email, asunto: e.target.value })} />
           </label>
-          <label>Mensaje
+          <label>{t('email.mensaje')}
             <textarea rows={6} value={email.texto} onChange={(e) => setEmail({ ...email, texto: e.target.value })} />
           </label>
           <div className="botones">
-            <button className="primario" onClick={mandarEmail} disabled={!email.asunto || !email.texto}>Enviar</button>
-            <button onClick={() => setEmail(null)}>Cancelar</button>
+            <button className="primario" onClick={mandarEmail} disabled={!email.asunto || !email.texto}>{t('email.enviar')}</button>
+            <button onClick={() => setEmail(null)}>{t('email.cancelar')}</button>
           </div>
         </div>
       )}
 
       <div className="filtros">
-        <select value={filtroProp} onChange={(e) => setFiltroProp(e.target.value)} aria-label="Filtrar por propiedad">
-          <option value="">Todas las propiedades</option>
-          <option value="sin">Sin propiedad</option>
+        <select value={filtroProp} onChange={(e) => setFiltroProp(e.target.value)} aria-label={t('filtros.propiedad')}>
+          <option value="">{t('filtros.todas')}</option>
+          <option value="sin">{t('filtros.sinPropiedad')}</option>
           {propiedades.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)}
         </select>
-        <input type="search" placeholder="Buscar lead (nombre, email, teléfono…)" value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar lead" />
+        <input type="search" placeholder={t('filtros.buscar')} value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)} aria-label={t('filtros.buscarAria')} />
       </div>
 
       <div className="kanban">
         {ETAPAS.map((etapa) => (
           <section key={etapa} className={`col col-${etapa}`}>
-            <h2>{TITULOS[etapa]} <span className="n">{visibles.filter((l) => l.etapa === etapa).length}</span></h2>
+            <h2>{t(`etapa.${etapa}`)} <span className="n">{visibles.filter((l) => l.etapa === etapa).length}</span></h2>
             {visibles.filter((l) => l.etapa === etapa).sort(porPrioridad).map((l) => (
               <article key={l.id} className={`lead${desatendido(l) ? ' desatendido' : ''}`}>
                 <strong>{l.nombre}</strong>
-                <div className="prioridad" role="group" aria-label={`Prioridad de ${l.nombre}`}>
+                <div className="prioridad" role="group" aria-label={t('lead.prioridadAria', { nombre: l.nombre })}>
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button key={n} className={l.prioridad === n ? 'activa' : ''}
                       aria-pressed={l.prioridad === n}
-                      title={l.prioridad === n ? 'Quitar prioridad' : `Prioridad ${n}`}
+                      title={l.prioridad === n ? t('lead.quitarPrioridad') : t('lead.prioridadN', { n })}
                       onClick={() => cambiarPrioridad(l, n)}>{n}</button>
                   ))}
-                  {!l.prioridad && <span className="sin" title="Sin prioridad">—</span>}
+                  {!l.prioridad && <span className="sin" title={t('lead.sinPrioridad')}>—</span>}
                 </div>
                 {l.expand?.propiedad && <span className="prop">🏠 {l.expand.propiedad.titulo}</span>}
-                <button className="seguimiento" onClick={() => verHistorial(l)} title="Ver historial y notas">
-                  {desatendido(l) ? '⚠ ' : ''}{haceCuanto(l.ultimo_contacto)}
+                <button className="seguimiento" onClick={() => verHistorial(l)} title={t('lead.historial')}>
+                  {desatendido(l) ? '⚠ ' : ''}{haceCuanto(locale, l.ultimo_contacto)}
                 </button>
                 {l.mensaje && <p className="msg">“{l.mensaje}”</p>}
 
                 {abierto === l.id && (
                   <ul className="historial">
-                    {historial.length === 0 && <li className="vacio">Sin contactos registrados</li>}
+                    {historial.length === 0 && <li className="vacio">{t('lead.sinContactos')}</li>}
                     {historial.map((a) => (
                       <li key={a.id}>
-                        <span>{ETIQUETA_CANAL[a.tipo] ?? a.tipo}</span>
-                        <span className="cuando">{haceCuanto(a.created)}</span>
-                        {a.estado_envio && ETIQUETA_ENVIO[a.estado_envio] && (
-                          <span className={`envio envio-${a.estado_envio}`}>{ETIQUETA_ENVIO[a.estado_envio]}</span>
+                        <span>{etiquetaCanal(locale, a.tipo)}</span>
+                        <span className="cuando">{haceCuanto(locale, a.created)}</span>
+                        {a.estado_envio && etiquetaEnvio(locale, a.estado_envio) && (
+                          <span className={`envio envio-${a.estado_envio}`}>{etiquetaEnvio(locale, a.estado_envio)}</span>
                         )}
                         {a.asunto && <span className="asunto">{a.asunto}</span>}
                         {a.nota && <span className="texto">{a.nota}</span>}
@@ -176,18 +173,24 @@ export default function Kanban() {
                   {l.email && (
                     <button className="enlace" onClick={() => setEmail({
                       lead: l,
-                      asunto: l.expand?.propiedad ? `Sobre ${l.expand.propiedad.titulo}` : 'Tu consulta',
-                      texto: `Hola ${l.nombre},\n\nGracias por tu interés${l.expand?.propiedad ? ` en "${l.expand.propiedad.titulo}"` : ''}. ¿Te viene bien que hablemos esta semana?\n\nUn saludo,\nInmobiliaria`,
+                      asunto: l.expand?.propiedad
+                        ? t('email.asuntoPropiedad', { propiedad: l.expand.propiedad.titulo })
+                        : t('email.asuntoGenerico'),
+                      texto: t('email.plantilla', {
+                        nombre: l.nombre,
+                        propiedad: l.expand?.propiedad
+                          ? t('email.plantillaPropiedad', { propiedad: l.expand.propiedad.titulo }) : '',
+                      }),
                     })}>✉️ Email</button>
                   )}
                 </div>
 
                 <div className="mover">
-                  <button onClick={() => mover(l, -1)} disabled={l.etapa === ETAPAS[0]} aria-label="Etapa anterior">←</button>
-                  <button onClick={() => mover(l, 1)} disabled={l.etapa === ETAPAS[ETAPAS.length - 1]} aria-label="Etapa siguiente">→</button>
+                  <button onClick={() => mover(l, -1)} disabled={l.etapa === ETAPAS[0]} aria-label={t('lead.etapaAnterior')}>←</button>
+                  <button onClick={() => mover(l, 1)} disabled={l.etapa === ETAPAS[ETAPAS.length - 1]} aria-label={t('lead.etapaSiguiente')}>→</button>
                 </div>
                 <div className="notas">
-                  <input placeholder="Añadir nota…" value={nota[l.id] ?? ''}
+                  <input placeholder={t('lead.nota')} value={nota[l.id] ?? ''}
                     onChange={(e) => setNota((n) => ({ ...n, [l.id]: e.target.value }))}
                     onKeyDown={(e) => e.key === 'Enter' && guardarNota(l)} />
                 </div>

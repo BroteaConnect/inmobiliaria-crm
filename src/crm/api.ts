@@ -1,12 +1,12 @@
+import { fmtMoney, intlOf, t } from '../lib/i18n';
 // api.ts — typed helpers over the factory's PocketBase client for this CRM.
 import { list, create, update, fileUrl, subscribe } from '../lib/pb';
 
 // Los datos de la clienta operan en dirhams (AED); un único sitio para
 // cambiar de mercado en el futuro.
-export const fmtPrecio = (n: number) =>
-  n != null && Number.isFinite(n)
-    ? `${n.toLocaleString('es-ES', { maximumFractionDigits: 0 })} AED`
-    : '—';
+// El mercado de la clienta opera en dirhams; Intl decide el formato por idioma.
+export const fmtPrecio = (locale: string, n: number) =>
+  (n != null && Number.isFinite(n) ? fmtMoney(locale, n, 'AED') : '—');
 
 export const ETAPAS = ['nuevo', 'contactado', 'visita', 'oferta', 'reservado', 'vendido', 'nutriendo'] as const;
 export type Etapa = (typeof ETAPAS)[number];
@@ -110,24 +110,21 @@ export const loadActividades = (leadId: string) =>
   list<Actividad>('actividades', { filter: `lead="${leadId}"`, sort: '-created', perPage: '50' })
     .then((r) => r.items);
 
-export const ETIQUETA_CANAL: Record<Canal, string> = {
-  nota: '📝 Nota', llamada: '📞 Llamada', email: '✉️ Email',
-  whatsapp: '💬 WhatsApp', visita: '🏠 Visita',
-};
+export const etiquetaCanal = (locale: string, canal: Canal) => t(locale, `canal.${canal}`);
+// Sin etiqueta para 'registrado': ese estado no se le muestra a la agente.
+export const etiquetaEnvio = (locale: string, estado: EstadoEnvio) =>
+  (estado === 'registrado' ? '' : t(locale, `envio.${estado}`));
 
-export const ETIQUETA_ENVIO: Partial<Record<EstadoEnvio, string>> = {
-  enviado: 'enviado', entregado: 'entregado', abierto: 'abierto ✓',
-  click: 'clicó el enlace ✓', error: 'no se pudo entregar',
-};
-
-/** "hace 3 días" — para el dato que más se mira en el kanban. */
-export function haceCuanto(iso?: string): string {
-  if (!iso) return 'sin contactar';
+/** "hace 3 días" — el dato que más se mira en el kanban.
+ *  Intl.RelativeTimeFormat da "hoy"/"ayer"/"hace 3 días" y sus equivalentes en
+ *  cualquier idioma, así que no hay una sola cadena que traducir a mano. */
+export function haceCuanto(locale: string, iso?: string): string {
+  if (!iso) return t(locale, 'time.sinContactar');
   const dias = Math.floor((Date.now() - new Date(iso.replace(' ', 'T')).getTime()) / 86400000);
-  if (dias <= 0) return 'hoy';
-  if (dias === 1) return 'ayer';
-  if (dias < 30) return `hace ${dias} días`;
-  return `hace ${Math.floor(dias / 30)} meses`;
+  const rtf = new Intl.RelativeTimeFormat(intlOf(locale), { numeric: 'auto' });
+  if (dias <= 0) return rtf.format(0, 'day');
+  if (dias < 30) return rtf.format(-dias, 'day');
+  return rtf.format(-Math.floor(dias / 30), 'month');
 }
 
 /** Un lead sin contacto en 2+ días necesita atención (regla del negocio). */
