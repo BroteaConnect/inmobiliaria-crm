@@ -6,9 +6,7 @@ import {
 } from './api';
 
 export default function Propiedades() {
-  // Solo el idioma para los formateadores; el copy de esta pantalla se traduce
-  // en el siguiente paso.
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const [props, setProps] = useState<Propiedad[]>([]);
   const [owners, setOwners] = useState<Propietario[]>([]);
   const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
@@ -28,7 +26,7 @@ export default function Propiedades() {
     const q = busquedaRef.current;
     (q.length >= 2 ? buscarPropiedades(q) : loadPropiedades())
       .then(setProps)
-      .catch((err) => setMsg({ tipo: 'error', texto: `No se pudieron recargar las propiedades: ${(err as Error).message}` }));
+      .catch((err) => setMsg({ tipo: 'error', texto: t('prop.errorRecargar', { error: (err as Error).message }) }));
     loadPropietarios().then(setOwners);
   };
   useEffect(() => { loadPropietarios().then(setOwners); }, []);
@@ -38,7 +36,7 @@ export default function Propiedades() {
   useEffect(() => {
     const q = busqueda.trim();
     const fallo = (err: Error) =>
-      setMsg({ tipo: 'error', texto: `No se pudo buscar: ${err.message}` });
+      setMsg({ tipo: 'error', texto: t('prop.errorBuscar', { error: err.message }) });
     if (q.length < 2) {
       // También con guarda de obsolescencia: esta carga sin debounce puede
       // llegar después que una búsqueda posterior y pisar sus resultados.
@@ -47,12 +45,13 @@ export default function Propiedades() {
         .catch(fallo);
       return;
     }
-    const t = setTimeout(() => {
+    // `timer`, no `t`: `t` es la función de traducción de este componente.
+    const timer = setTimeout(() => {
       buscarPropiedades(q)
         .then((items) => { if (busquedaRef.current === q) setProps(items); })
         .catch(fallo);
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [busqueda]);
 
   // Al abrir en modo edición, lleva el formulario a la vista (la card
@@ -68,7 +67,7 @@ export default function Propiedades() {
       await actualizarPropiedad(p.id, { estado: p.estado === 'publicada' ? 'borrador' : 'publicada' });
       recargar();
     } catch (err) {
-      setMsg({ tipo: 'error', texto: `No se pudo cambiar el estado: ${(err as Error).message}` });
+      setMsg({ tipo: 'error', texto: t('prop.errorEstado', { error: (err as Error).message }) });
     }
   };
 
@@ -78,7 +77,7 @@ export default function Propiedades() {
   // campos a medio editar no se pierden).
   const borrarFoto = async (p: Propiedad, nombre: string) => {
     if (borrando) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
-    if (!confirm('¿Eliminar esta foto? El borrado es permanente.')) return;
+    if (!confirm(t('prop.confirmarFoto'))) return;
     setMsg(null);
     setBorrando(nombre);
     try {
@@ -88,7 +87,7 @@ export default function Propiedades() {
       setForm((f) => (typeof f === 'object' && f.id === actualizada.id ? actualizada : f));
       recargar();
     } catch (err) {
-      setMsg({ tipo: 'error', texto: `No se pudo eliminar la foto: ${(err as Error).message}` });
+      setMsg({ tipo: 'error', texto: t('prop.errorFoto', { error: (err as Error).message }) });
     } finally {
       setBorrando(null);
     }
@@ -133,7 +132,7 @@ export default function Propiedades() {
         if (editando) await actualizarPropiedad(editando.id, payload); // sin fotos → JSON puro
         else await crearPropiedad(payload);
       } else {
-        setMsg({ tipo: 'ok', texto: 'Preparando fotos…' });
+        setMsg({ tipo: 'ok', texto: t('prop.preparandoFotos') });
         const fotos = await Promise.all(brutas.map(normalizaFoto));
         const fd = new FormData();
         if (editando) {
@@ -155,12 +154,12 @@ export default function Propiedades() {
       setMsg({
         tipo: 'ok',
         texto: editando
-          ? `"${payload.titulo}" actualizada.`
-          : `"${payload.titulo}" guardada en borrador — revísala y publícala.`,
+          ? t('prop.actualizada', { titulo: String(payload.titulo) })
+          : t('prop.guardada', { titulo: String(payload.titulo) }),
       });
       recargar();
     } catch (err) {
-      setMsg({ tipo: 'error', texto: `No se pudo guardar: ${(err as Error).message}` });
+      setMsg({ tipo: 'error', texto: t('prop.errorGuardar', { error: (err as Error).message }) });
     } finally {
       setEnviando(false);
     }
@@ -169,11 +168,11 @@ export default function Propiedades() {
   return (
     <div>
       <div className="barra">
-        <h1>Propiedades</h1>
-        <input type="search" className="buscador" placeholder="Buscar por título, municipio, dirección…"
-          value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar propiedad" />
+        <h1>{t('prop.titulo')}</h1>
+        <input type="search" className="buscador" placeholder={t('prop.buscar')}
+          value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label={t('prop.buscarAria')} />
         <button className="primario" onClick={() => setForm(form === 'cerrado' ? 'nueva' : 'cerrado')}>
-          {form === 'cerrado' ? '+ Nueva propiedad' : 'Cancelar'}
+          {form === 'cerrado' ? t('prop.nueva') : t('prop.cancelar')}
         </button>
       </div>
       {msg && <p role="status" className={`aviso aviso-${msg.tipo}`}>{msg.texto}</p>}
@@ -188,20 +187,20 @@ export default function Propiedades() {
           className="alta"
           onSubmit={guardar}
         >
-          <h2>{editando ? `Editar "${editando.titulo}"` : 'Nueva propiedad'}</h2>
+          <h2>{editando ? t('prop.editarTitulo', { titulo: editando.titulo }) : t('prop.nuevaTitulo')}</h2>
           <div className="fila2">
-            <label>Título <input name="titulo" required defaultValue={editando?.titulo ?? ''} /></label>
-            <label>Municipio <input name="municipio" defaultValue={editando?.municipio ?? ''} /></label>
-            <label>Dirección <input name="direccion" defaultValue={editando?.direccion ?? ''} /></label>
+            <label>{t('prop.campo.titulo')} <input name="titulo" required defaultValue={editando?.titulo ?? ''} /></label>
+            <label>{t('prop.campo.municipio')} <input name="municipio" defaultValue={editando?.municipio ?? ''} /></label>
+            <label>{t('prop.campo.direccion')} <input name="direccion" defaultValue={editando?.direccion ?? ''} /></label>
           </div>
           <div className="fila">
-            <label>Precio € <input name="precio" type="number" min="0" defaultValue={editando?.precio ?? ''} /></label>
-            <label>Hab. <input name="habitaciones" type="number" min="0" defaultValue={editando?.habitaciones ?? ''} /></label>
-            <label>Baños <input name="banos" type="number" min="0" defaultValue={editando?.banos ?? ''} /></label>
-            <label>m² <input name="superficie" type="number" min="0" defaultValue={editando?.superficie ?? ''} /></label>
+            <label>{t('prop.campo.precio')} <input name="precio" type="number" min="0" defaultValue={editando?.precio ?? ''} /></label>
+            <label>{t('prop.campo.habitaciones')} <input name="habitaciones" type="number" min="0" defaultValue={editando?.habitaciones ?? ''} /></label>
+            <label>{t('prop.campo.banos')} <input name="banos" type="number" min="0" defaultValue={editando?.banos ?? ''} /></label>
+            <label>{t('prop.campo.superficie')} <input name="superficie" type="number" min="0" defaultValue={editando?.superficie ?? ''} /></label>
           </div>
-          <label>Descripción <textarea name="descripcion" rows={3} defaultValue={editando?.descripcion ?? ''} /></label>
-          <label>Propietario
+          <label>{t('prop.campo.descripcion')} <textarea name="descripcion" rows={3} defaultValue={editando?.descripcion ?? ''} /></label>
+          <label>{t('prop.campo.propietario')}
             <select name="propietario" defaultValue={editando?.propietario ?? ''}>
               <option value="">—</option>
               {owners.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
@@ -211,20 +210,20 @@ export default function Propiedades() {
             <div className="fotos-actuales">
               <span className="pista">
                 {editando.fotos?.length
-                  ? `${editando.fotos.length} ${editando.fotos.length === 1 ? 'foto' : 'fotos'}`
-                  : 'Sin fotos todavía.'}
+                  ? t('prop.fotos', { count: editando.fotos.length })
+                  : t('prop.sinFotos')}
               </span>
               {(editando.fotos?.length ?? 0) > 0 && (
                 <ul className="tira-fotos">
                   {editando.fotos.map((nombre, i) => (
                     <li key={nombre}>
-                      <img src={fotosUrls(editando)[i]} alt={`Foto ${i + 1} de "${editando.titulo}"`} loading="lazy" />
+                      <img src={fotosUrls(editando)[i]} alt={t('prop.fotoAlt', { n: i + 1, titulo: editando.titulo })} loading="lazy" />
                       <button
                         type="button"
                         className="quitar-foto"
                         disabled={enviando || borrando !== null}
-                        aria-label={`Eliminar foto ${i + 1}`}
-                        title="Eliminar foto"
+                        aria-label={t('prop.eliminarFoto', { n: i + 1 })}
+                        title={t('prop.eliminarFotoTitle')}
                         onClick={() => borrarFoto(editando, nombre)}
                       >✕</button>
                     </li>
@@ -233,20 +232,20 @@ export default function Propiedades() {
               )}
             </div>
           )}
-          <label>Fotos <input name="fotos" type="file" accept="image/*" multiple />
-            {editando && <span className="pista">Las fotos nuevas se añaden a las existentes.</span>}
+          <label>{t('prop.campo.fotos')} <input name="fotos" type="file" accept="image/*" multiple />
+            {editando && <span className="pista">{t('prop.fotosNuevas')}</span>}
           </label>
           <div className="acciones">
             <button className="primario" type="submit" disabled={enviando || borrando !== null}>
-              {enviando ? 'Guardando…' : 'Guardar'}
+              {enviando ? t('prop.guardando') : t('prop.guardar')}
             </button>
-            <button type="button" disabled={enviando} onClick={() => setForm('cerrado')}>Cancelar</button>
+            <button type="button" disabled={enviando} onClick={() => setForm('cerrado')}>{t('prop.cancelar')}</button>
           </div>
         </form>
       )}
 
       {busqueda.trim().length >= 2 && props.length === 0 && (
-        <p className="sin-resultados">Sin resultados para «{busqueda.trim()}».</p>
+        <p className="sin-resultados">{t('prop.sinResultados', { q: busqueda.trim() })}</p>
       )}
 
       <div className="grid">
@@ -258,22 +257,22 @@ export default function Propiedades() {
                 {/* La portada (fotos[0]) no cambia al añadir fotos ('fotos+'
                     las pone al final); el contador sí, y es el feedback de
                     que la subida funcionó. */}
-                <span className="n-fotos" title={`${p.fotos.length} ${p.fotos.length === 1 ? 'foto' : 'fotos'}`}>
+                <span className="n-fotos" title={t('prop.fotos', { count: p.fotos.length })}>
                   📷 {p.fotos.length}
                 </span>
               </div>
             ) : <div className="sinfoto">📷</div>}
             <div className="cuerpo">
               <strong>{p.titulo}</strong>
-              <span className="meta">{p.municipio} · {p.habitaciones ?? '–'} hab · {p.superficie ?? '–'} m²</span>
+              <span className="meta">{t('prop.meta', { municipio: p.municipio, rooms: p.habitaciones ?? '–', area: p.superficie ?? '–' })}</span>
               <span className="precio">{fmtPrecio(locale, p.precio)}</span>
-              <span className={`estado estado-${p.estado}`}>{p.estado}</span>
+              <span className={`estado estado-${p.estado}`}>{t(`estadoProp.${p.estado}`)}</span>
               {(p.estado === 'borrador' || p.estado === 'publicada') && (
                 <button onClick={() => publicar(p)}>
-                  {p.estado === 'publicada' ? 'Retirar de la web' : 'Publicar en la web'}
+                  {p.estado === 'publicada' ? t('prop.retirar') : t('prop.publicar')}
                 </button>
               )}
-              <button onClick={() => setForm(p)}>Editar</button>
+              <button onClick={() => setForm(p)}>{t('prop.editar')}</button>
             </div>
           </article>
         ))}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../lib/LocaleContext';
 import {
   crearPropietario, crearPropiedad, crearLead, loadPropietarios, loadLeads, loadPropiedades,
 } from './api';
@@ -28,18 +29,13 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+// El destino de cada columna. La etiqueta que ve la agente sale del
+// diccionario (campo.<clave>); aquí solo vive el nombre del campo.
 const CAMPOS = [
-  ['(ignorar)', ''],
-  ['Persona · nombre', 'p_nombre'], ['Persona · teléfono', 'p_telefono'],
-  ['Persona · email', 'p_email'], ['Persona · país', 'p_pais'],
-  ['Persona · rol (Buyer/Seller)', 'party_tipo'],
-  ['Propiedad · título', 'titulo'], ['Propiedad · zona/master project', 'municipio'],
-  ['Propiedad · proyecto', 'proyecto'], ['Propiedad · edificio', 'edificio'],
-  ['Propiedad · unidad/nº', 'unidad'], ['Propiedad · dirección', 'direccion'],
-  ['Propiedad · precio/valor', 'precio'], ['Propiedad · habitaciones', 'habitaciones'],
-  ['Propiedad · baños', 'banos'], ['Propiedad · superficie (sqft→m²)', 'superficie'],
-  ['Propiedad · descripción', 'descripcion'],
-  ['Transacción · fecha', 't_fecha'], ['Transacción · procedimiento', 't_proc'],
+  '', 'p_nombre', 'p_telefono', 'p_email', 'p_pais', 'party_tipo',
+  'titulo', 'municipio', 'proyecto', 'edificio', 'unidad', 'direccion',
+  'precio', 'habitaciones', 'banos', 'superficie', 'descripcion',
+  't_fecha', 't_proc',
 ] as const;
 
 // Autodetección de cabeceras: sinónimos en español + el esquema de registros
@@ -85,6 +81,7 @@ const superficieM2 = (v: string) => {
 };
 
 export default function Importar() {
+  const { t } = useI18n();
   const [rows, setRows] = useState<string[][]>([]);
   const [map, setMap] = useState<string[]>([]);
   const [log, setLog] = useState('');
@@ -97,7 +94,7 @@ export default function Importar() {
   });
 
   const importar = async () => {
-    setLog('Importando…');
+    setLog(t('imp.importando'));
     try {
       const propietarios = await loadPropietarios();
       const ownerId = new Map(propietarios.map((o) => [o.nombre.toLowerCase(), o.id]));
@@ -165,18 +162,17 @@ export default function Importar() {
         propId.set(titulo.toLowerCase(), p.id);
         nProps++;
       }
-      setLog(`✓ Importados: ${nOwners} propietarios, ${nProps} propiedades (en borrador) y ${nLeads} leads en cartera.${saltadas ? ` ${saltadas} filas saltadas (duplicadas o sin datos clave).` : ''}`);
+      setLog(t('imp.ok', { owners: nOwners, props: nProps, leads: nLeads })
+        + (saltadas ? t('imp.saltadas', { count: saltadas }) : ''));
     } catch (err) {
-      setLog(`✖ Error al importar: ${(err as Error).message}`);
+      setLog(t('imp.error', { error: (err as Error).message }));
     }
   };
 
   return (
     <div className="importar">
-      <h1>Importar desde tu Excel</h1>
-      <p className="ayuda">Guarda tu Excel como <strong>CSV</strong> (Archivo → Guardar como → CSV) y súbelo.
-        Revisa a qué corresponde cada columna y pulsa importar. Las filas de <em>vendedores</em> crean
-        propietario + su propiedad (en borrador); las de <em>compradores</em> entran como leads en cartera.</p>
+      <h1>{t('imp.titulo')}</h1>
+      <p className="ayuda">{t('imp.paso1')} {t('imp.paso2')} {t('imp.paso3')}</p>
       <input type="file" accept=".csv,text/csv,.tsv" onChange={(e) => e.target.files?.[0] && leer(e.target.files[0])} />
       {rows.length > 0 && (
         <>
@@ -184,9 +180,11 @@ export default function Importar() {
             <table>
               <thead><tr>{rows[0].map((h, i) => (
                 <th key={i}>
-                  <div className="col-origen">{h || `Columna ${i + 1}`}</div>
+                  <div className="col-origen">{h || t('imp.columna', { n: i + 1 })}</div>
                   <select value={map[i] ?? ''} onChange={(e) => setMap((m) => m.map((v, j) => (j === i ? e.target.value : v)))}>
-                    {CAMPOS.map(([label, v]) => <option key={v} value={v}>{label}</option>)}
+                    {CAMPOS.map((v) => (
+                      <option key={v} value={v}>{t(v ? `campo.${v}` : 'campo.ignorar')}</option>
+                    ))}
                   </select>
                 </th>
               ))}</tr></thead>
@@ -195,8 +193,8 @@ export default function Importar() {
               ))}</tbody>
             </table>
           </div>
-          <p className="ayuda">{rows.length - 1} filas detectadas (se muestran las 3 primeras).</p>
-          <button className="primario" onClick={importar}>Importar {rows.length - 1} filas</button>
+          <p className="ayuda">{t('imp.filas', { count: rows.length - 1 })}</p>
+          <button className="primario" onClick={importar}>{t('imp.importar', { count: rows.length - 1 })}</button>
         </>
       )}
       <p role="status" className="resultado">{log}</p>
