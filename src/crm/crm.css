@@ -235,3 +235,20 @@ select:focus-visible, textarea:focus-visible {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: none; }
 }
+
+/* Acceso: la entrada normal es la cuenta de Brotea; la de emergencia solo
+   aparece cuando el proveedor de identidad no responde (o si alguien la pide),
+   y por eso se separa visualmente en vez de convivir con la principal. */
+.login p { color: var(--muted); margin: 0 0 var(--space-3); }
+.login .separador { text-align: center; font-size: .85rem; margin: var(--space-3) 0; }
+.login .aviso { color: var(--ok-strong, var(--ok)); }
+.login .enlace {
+  display: block; margin-top: var(--space-3); padding: 0; border: 0; background: none;
+  color: var(--muted); font: inherit; font-size: .85rem; text-decoration: underline; cursor: pointer;
+}
+.login .enlace:hover { color: var(--primary); }
+.login .emergencia {
+  margin-top: var(--space-4); border: 1px solid var(--warn); border-radius: var(--radius);
+  padding: var(--space-4); background: var(--surface);
+}
+.login .emergencia h2 { margin: 0 0 var(--space-2); font-size: 1rem; }
