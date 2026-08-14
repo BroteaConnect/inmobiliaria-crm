@@ -1,6 +1,6 @@
 import { fmtMoney, intlOf, t } from '../lib/i18n';
 // api.ts — typed helpers over the factory's PocketBase client for this CRM.
-import { list, create, update, fileUrl, subscribe } from '../lib/pb';
+import { list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
 
 // Los datos de la clienta operan en dirhams (AED); un único sitio para
 // cambiar de mercado en el futuro.
@@ -37,45 +37,17 @@ export interface Actividad {
   estado_envio?: EstadoEnvio; mensaje_id?: string;
 }
 
-/**
- * Every row, not the first page of them.
- *
- * These loaders asked for `perPage: '200'` and handed the result to the UI as
- * if it were everything. On 2026-08-14 the agency had 226 leads, 265
- * properties and 202 owners: 26 leads and 65 properties were simply not on
- * screen, with nothing saying so. A list that silently stops is worse than one
- * that fails, because the failure is invisible until somebody asks where a
- * client went.
- *
- * PocketBase reports `totalItems`, so pagination is a loop, not a guess. (It
- * also reports `totalPages`, which `pb.ts`'s `ListResult` does not declare —
- * a gap worth closing in the brick rather than working around here.) The cap
- * exists so a runaway collection cannot hang the browser, and if it is ever
- * reached it says so out loud instead of truncating quietly.
- */
-const MAX_PAGES = 25; // 12,500 rows at 500/page
-
-async function loadAll<T>(collection: string, params: Record<string, string>): Promise<T[]> {
-  const out: T[] = [];
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const res = await list<T>(collection, { ...params, perPage: '500', page: String(page) });
-    out.push(...res.items);
-    if (out.length >= res.totalItems || res.items.length === 0) return out;
-    if (page === MAX_PAGES) {
-      console.warn(`[crm] ${collection}: stopped at ${out.length} of ${res.totalItems} rows`);
-    }
-  }
-  return out;
-}
-
+// Paging lives in the db brick now: this app had its own copy for exactly one
+// afternoon, which is one afternoon longer than a second implementation should
+// live anywhere.
 export const loadLeads = () =>
-  loadAll<Lead>('leads', { sort: '-created', expand: 'propiedad' });
+  listAll<Lead>('leads', { sort: '-created', expand: 'propiedad' });
 
 export const loadPropiedades = () =>
-  loadAll<Propiedad>('propiedades', { sort: '-created' });
+  listAll<Propiedad>('propiedades', { sort: '-created' });
 
 export const loadPropietarios = () =>
-  loadAll<Propietario>('propietarios', { sort: 'nombre' });
+  listAll<Propietario>('propietarios', { sort: 'nombre' });
 
 export const moverLead = (id: string, etapa: Etapa) => update<Lead>('leads', id, { etapa });
 
