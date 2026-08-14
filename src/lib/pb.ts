@@ -16,6 +16,14 @@ export const authToken = () => (typeof localStorage !== 'undefined' ? localStora
 export const isLoggedIn = () => !!authToken();
 export const logout = () => localStorage.removeItem(TOKEN_KEY);
 
+/**
+ * Install a token obtained somewhere other than `login()` — today that means
+ * the `auth` brick, which trades a Brotea identity for a PocketBase token.
+ * Everything downstream (CRUD, files, realtime) then works unchanged: this
+ * module stays the single place that knows where the token lives.
+ */
+export const setAuthToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (!(init.body instanceof FormData)) headers['Content-Type'] = 'application/json';
