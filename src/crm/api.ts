@@ -37,14 +37,45 @@ export interface Actividad {
   estado_envio?: EstadoEnvio; mensaje_id?: string;
 }
 
+/**
+ * Every row, not the first page of them.
+ *
+ * These loaders asked for `perPage: '200'` and handed the result to the UI as
+ * if it were everything. On 2026-08-14 the agency had 226 leads, 265
+ * properties and 202 owners: 26 leads and 65 properties were simply not on
+ * screen, with nothing saying so. A list that silently stops is worse than one
+ * that fails, because the failure is invisible until somebody asks where a
+ * client went.
+ *
+ * PocketBase reports `totalItems`, so pagination is a loop, not a guess. (It
+ * also reports `totalPages`, which `pb.ts`'s `ListResult` does not declare —
+ * a gap worth closing in the brick rather than working around here.) The cap
+ * exists so a runaway collection cannot hang the browser, and if it is ever
+ * reached it says so out loud instead of truncating quietly.
+ */
+const MAX_PAGES = 25; // 12,500 rows at 500/page
+
+async function loadAll<T>(collection: string, params: Record<string, string>): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await list<T>(collection, { ...params, perPage: '500', page: String(page) });
+    out.push(...res.items);
+    if (out.length >= res.totalItems || res.items.length === 0) return out;
+    if (page === MAX_PAGES) {
+      console.warn(`[crm] ${collection}: stopped at ${out.length} of ${res.totalItems} rows`);
+    }
+  }
+  return out;
+}
+
 export const loadLeads = () =>
-  list<Lead>('leads', { sort: '-created', perPage: '200', expand: 'propiedad' }).then((r) => r.items);
+  loadAll<Lead>('leads', { sort: '-created', expand: 'propiedad' });
 
 export const loadPropiedades = () =>
-  list<Propiedad>('propiedades', { sort: '-created', perPage: '200' }).then((r) => r.items);
+  loadAll<Propiedad>('propiedades', { sort: '-created' });
 
 export const loadPropietarios = () =>
-  list<Propietario>('propietarios', { sort: 'nombre', perPage: '200' }).then((r) => r.items);
+  loadAll<Propietario>('propietarios', { sort: 'nombre' });
 
 export const moverLead = (id: string, etapa: Etapa) => update<Lead>('leads', id, { etapa });
 
@@ -78,7 +109,7 @@ export const buscarPropiedades = (q: string) => {
   const seguro = q.replace(/\\/g, '').replace(/"/g, '\\"');
   const filtro = ['titulo', 'municipio', 'direccion', 'descripcion']
     .map((campo) => `${campo} ~ "${seguro}"`).join(' || ');
-  return list<Propiedad>('propiedades', { filter: filtro, sort: '-created', perPage: '200' })
+  return list<Propiedad>('propiedades', { filter: filtro, sort: '-created', perPage: '500' })
     .then((r) => r.items);
 };
 
