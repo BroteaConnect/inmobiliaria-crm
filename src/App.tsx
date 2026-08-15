@@ -6,6 +6,7 @@ import { SettingsProvider, useSettings } from './lib/SettingsContext';
 import { moduleEnabled } from './lib/settings';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import { features } from './features/registry';
+import { TabBar } from './components/kit';
 import Login from './crm/Login';
 import { completeCallback, AuthError } from './lib/auth';
 import Kanban from './crm/Kanban';
@@ -37,6 +38,16 @@ function Nav({ onLogout }: { onLogout: () => void }) {
       >
         <span /><span /><span />
       </button>
+      <TabBar
+        moreOpen={menuOpen}
+        more={() => setMenuOpen((o) => !o)}
+        moreLabel={t('nav.mas')}
+        items={[
+          moduleEnabled(settings, 'modules.today') && { to: '/hoy', label: t('nav.hoy'), icon: '◔' },
+          moduleEnabled(settings, 'modules.leads') && { to: '/', label: t('nav.leads'), icon: '☰', end: true },
+          moduleEnabled(settings, 'modules.properties') && { to: '/propiedades', label: t('nav.propiedades'), icon: '⌂' },
+        ].filter(Boolean) as { to: string; label: string; icon: string; end?: boolean }[]}
+      />
       <div id="nav-links" className={`links${menuOpen ? ' abierto' : ''}`}>
         {moduleEnabled(settings, 'modules.today')
           && <NavLink to="/hoy" onClick={cerrar}>{t('nav.hoy')}</NavLink>}
