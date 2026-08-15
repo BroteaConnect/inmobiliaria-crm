@@ -331,3 +331,8 @@ select:focus-visible, textarea:focus-visible {
 .prioridad .nivel-medium.activa { background: var(--signal-medium); }
 .prioridad .nivel-low.activa { background: var(--signal-low); color: var(--text); }
 .prioridad .sin { color: var(--muted); font-size: .8rem; align-self: center; }
+
+/* Campos del alta manual, dentro del panel. */
+.campo { display: block; margin-bottom: var(--space-3); font-weight: 600; font-size: .85rem; }
+.campo input, .campo select, .campo textarea { display: block; width: 100%; margin-top: .3rem;
+  font-weight: 400; }

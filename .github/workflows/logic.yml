@@ -26,4 +26,5 @@ jobs:
         run: |
           node --import ./scripts/ts-test-register.mjs --test \
             src/lib/*.test.mjs src/crm/*.test.mjs \
-            src/features/today/*.test.mjs src/integrations/*.test.mjs
+            src/features/today/*.test.mjs src/features/informes/*.test.mjs \
+            src/integrations/*.test.mjs

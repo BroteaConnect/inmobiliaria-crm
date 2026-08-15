@@ -28,6 +28,7 @@ export const DEFAULTS: SettingsMap = {
   'modules.leads': { v: 1, enabled: true },
   'modules.properties': { v: 1, enabled: true },
   'modules.imports': { v: 1, enabled: true },
+  'modules.reports': { v: 1, enabled: true },
   'integrations.messaging': { v: 1, adapter: 'mock' },
   'integrations.drafting': { v: 1, adapter: 'mock' },
   'integrations.campaigns': { v: 1, adapter: 'mock' },
