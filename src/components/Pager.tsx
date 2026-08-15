@@ -1,5 +1,6 @@
 import { useI18n } from '../lib/LocaleContext';
 import type { Page } from '../lib/list.mjs';
+import './Pager.css';
 
 // The controls, so no screen writes "Página 2 de 4" by hand — and so the two
 // required languages are one dictionary entry away instead of one refactor.
