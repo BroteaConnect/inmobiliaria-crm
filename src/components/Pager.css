@@ -1,0 +1,27 @@
+/* The controls, in tokens. The astro side carries its styles in the component;
+   React has no scoped-style equivalent, so they live beside it and the
+   component imports them — a brick that ships a control without its appearance
+   ships raw browser buttons at the bottom of somebody's grid. That is what the
+   estate agency got the first time this was adopted. */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.pager button {
+  padding: .4rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.pager button:hover:not([disabled]) { border-color: var(--muted); }
+.pager button[disabled] { opacity: .5; cursor: default; }
+.pager > span { font-size: .85rem; font-variant-numeric: tabular-nums; }
+/* Pushed to the far end: it is a fact about the list, not a control. */
+.pager small { margin-inline-start: auto; color: var(--muted); font-size: .8rem; }
