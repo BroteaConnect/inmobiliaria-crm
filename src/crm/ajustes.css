@@ -10,3 +10,5 @@
 .ajustes-fila-hint { font-size: .78rem; color: var(--muted); }
 .ajustes .aviso { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: var(--space-3); font-size: .85rem; }
+.campo-pendiente { color: var(--alert); font-weight: 600; font-size: .78rem; }
+.ajustes .campo input { max-width: 26rem; }

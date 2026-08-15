@@ -1,15 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  CACHE_KEY,
-  DEFAULTS,
-  adapterOf,
-  mergeSettings,
-  moduleEnabled,
-  readCache,
-  toRows,
-  writeCache,
-} from './settings';
+import { CACHE_KEY, DEFAULTS, adapterOf, mergeSettings, moduleEnabled, negocioPendiente, readCache, textOf, toRows, writeCache } from './settings';
 
 const fakeStorage = (seed = {}) => {
   const data = { ...seed };
@@ -112,4 +103,39 @@ test('a storage that refuses to write costs a slower paint, not an error', () =>
 
 test('rows and the map are the same thing seen twice', () => {
   assert.deepEqual(mergeSettings(toRows(DEFAULTS)), DEFAULTS);
+});
+
+// — Datos del negocio —————————————————————————————————————————————
+// Son los que la web pública pone en su aviso legal, así que lo que importa es
+// que un valor a medias no llegue a una página legal como si fuera bueno.
+
+test('un dato del negocio se lee como texto, y vacío significa pendiente', () => {
+  const s = mergeSettings([{ key: 'negocio.nif', value: { v: 1, text: 'B12345678' } }]);
+  assert.equal(textOf(s, 'negocio.nif'), 'B12345678');
+  assert.equal(textOf(s, 'negocio.razonSocial'), '');
+  assert.deepEqual(negocioPendiente(s), ['negocio.razonSocial', 'negocio.domicilio', 'negocio.registro']);
+});
+
+test('los espacios no cuentan como rellenado', () => {
+  // Un campo con un espacio se ve igual de vacío en la página y distinto en la
+  // base de datos: la que manda es la página.
+  const s = mergeSettings([{ key: 'negocio.razonSocial', value: { v: 1, text: '   ' } }]);
+  assert.equal(textOf(s, 'negocio.razonSocial'), '');
+  assert.ok(negocioPendiente(s).includes('negocio.razonSocial'));
+});
+
+test('acepta la fila que alguien escribió a mano antes de esta pantalla', () => {
+  const s = mergeSettings([{ key: 'contacto.whatsapp', value: { numero: '+34600123456' } }]);
+  assert.equal(textOf(s, 'contacto.whatsapp'), '+34600123456');
+});
+
+test('una fila con la forma equivocada no borra el dato, deja el vacío', () => {
+  const s = mergeSettings([{ key: 'negocio.nif', value: { v: 1, enabled: true } }]);
+  assert.equal(textOf(s, 'negocio.nif'), '');
+});
+
+test('el JSON guardado como cadena también vale', () => {
+  // PocketBase devuelve string si el campo es `text` en vez de `json`.
+  const s = mergeSettings([{ key: 'negocio.domicilio', value: '{"v":1,"text":"Calle Mayor 3"}' }]);
+  assert.equal(textOf(s, 'negocio.domicilio'), 'Calle Mayor 3');
 });

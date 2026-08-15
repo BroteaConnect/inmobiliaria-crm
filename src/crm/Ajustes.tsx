@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { useSettings } from '../lib/SettingsContext';
-import { moduleEnabled, adapterOf, type SettingValue } from '../lib/settings';
+import {
+  NEGOCIO_REQUERIDO, adapterOf, moduleEnabled, negocioPendiente, textOf, type SettingValue,
+} from '../lib/settings';
 import { Button, Chip, Toggle } from '../components/kit';
 import './ajustes.css';
 
@@ -14,6 +16,14 @@ import './ajustes.css';
 // turned on without a deploy. The alternative is a branch that lives for weeks.
 
 const MODULES = ['modules.today', 'modules.leads', 'modules.properties', 'modules.imports', 'modules.reports'] as const;
+// Los datos del negocio, en el orden en que se leen en una página legal.
+// `contacto.whatsapp` va con ellos porque es lo mismo: un dato del negocio que
+// la web pública enseña, no una preferencia del CRM.
+const NEGOCIO = [
+  'negocio.razonSocial', 'negocio.nif', 'negocio.domicilio', 'negocio.registro',
+  'negocio.telefono', 'negocio.email', 'contacto.whatsapp',
+] as const;
+
 const INTEGRATIONS = [
   'integrations.messaging',
   'integrations.drafting',
@@ -29,6 +39,7 @@ export default function Ajustes() {
   const { t } = useI18n();
   const { settings, ready, remote, save } = useSettings();
   const [failed, setFailed] = useState<string | null>(null);
+  const pendientes = negocioPendiente(settings);
 
   const write = async (key: string, value: SettingValue) => {
     setFailed(null);
@@ -48,6 +59,37 @@ export default function Ajustes() {
 
       {ready && !remote && <p className="aviso" role="status">{t('ajustes.local')}</p>}
       {failed && <p className="error" role="alert">{t('ajustes.errorGuardar')}</p>}
+
+      <h2>{t('ajustes.negocio')}</h2>
+      <p className="ajustes-intro">{t('ajustes.negocio.intro')}</p>
+      {pendientes.length > 0 && (
+        <p className="aviso" role="status">
+          {t('ajustes.negocio.pendiente', { n: String(pendientes.length) })}
+        </p>
+      )}
+      <div className="ajustes-lista">
+        {NEGOCIO.map((key) => {
+          const corto = key.split('.')[1];
+          const requerido = (NEGOCIO_REQUERIDO as readonly string[]).includes(key);
+          return (
+            <label className="campo" key={key}>
+              {t(`ajustes.negocio.${corto}`)}
+              {requerido && !textOf(settings, key) && <span className="campo-pendiente"> · {t('ajustes.negocio.falta')}</span>}
+              <input
+                defaultValue={textOf(settings, key)}
+                placeholder={t(`ajustes.negocio.${corto}.ph`)}
+                // Al salir del campo, no en cada tecla: un guardado por
+                // pulsación llenaría el historial de la fila de versiones a
+                // medio escribir.
+                onBlur={(e) => {
+                  const texto = e.target.value.trim();
+                  if (texto !== textOf(settings, key)) write(key, { v: 1, text: texto });
+                }}
+              />
+            </label>
+          );
+        })}
+      </div>
 
       <h2>{t('ajustes.modulos')}</h2>
       <div className="ajustes-lista">

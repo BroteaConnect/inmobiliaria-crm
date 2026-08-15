@@ -12,8 +12,10 @@
 import type { AdapterKind } from '../integrations/types';
 
 export interface ModuleSetting { v: 1; enabled: boolean }
+/** Un dato del negocio: una línea de texto que la web pública también lee. */
+export interface TextSetting { v: 1; text: string }
 export interface IntegrationSetting { v: 1; adapter: AdapterKind; config?: Record<string, unknown> }
-export type SettingValue = ModuleSetting | IntegrationSetting;
+export type SettingValue = ModuleSetting | IntegrationSetting | TextSetting;
 export type SettingsMap = Record<string, SettingValue>;
 
 /** A row of the `settings` collection, as `src/crm/api.ts` reads it. */
@@ -34,6 +36,17 @@ export const DEFAULTS: SettingsMap = {
   'integrations.campaigns': { v: 1, adapter: 'mock' },
   'integrations.reports': { v: 1, adapter: 'mock' },
   'integrations.maps': { v: 1, adapter: 'mock' },
+  // Los datos del negocio. Vacíos a propósito: el aviso legal y la política de
+  // privacidad de la web los leen de aquí, y un NIF inventado publicado en una
+  // página legal es peor que un hueco que se ve. Vacío significa «pendiente», y
+  // la pantalla de Ajustes lo dice mientras lo esté.
+  'negocio.razonSocial': { v: 1, text: '' },
+  'negocio.nif': { v: 1, text: '' },
+  'negocio.domicilio': { v: 1, text: '' },
+  'negocio.registro': { v: 1, text: '' },
+  'negocio.telefono': { v: 1, text: '' },
+  'negocio.email': { v: 1, text: '' },
+  'contacto.whatsapp': { v: 1, text: '' },
 };
 
 export const CACHE_KEY = 'crm_settings_v1';
@@ -75,6 +88,14 @@ function coerce(key: string, value: unknown): SettingValue | null {
     if (isObject(raw.config)) out.config = raw.config;
     return out;
   }
+  // `numero` además de `text`: la fila del número de WhatsApp puede haberse
+  // escrito a mano antes de que existiera esta pantalla, y una fila válida no
+  // se descarta por el nombre del campo.
+  if (key.startsWith('negocio.') || key.startsWith('contacto.')) {
+    const texto = typeof raw.text === 'string' ? raw.text
+      : typeof raw.numero === 'string' ? raw.numero : null;
+    return texto === null ? null : { v: 1, text: texto.trim() };
+  }
   return null;
 }
 
@@ -101,6 +122,21 @@ export const moduleEnabled = (settings: SettingsMap, key: string): boolean => {
   const value = settings[key];
   return !!value && 'enabled' in value && value.enabled;
 };
+
+/** El texto de un dato del negocio, o cadena vacía si nadie lo ha rellenado. */
+export const textOf = (settings: SettingsMap, key: string): string => {
+  const value = settings[key];
+  return value && 'text' in value ? value.text : '';
+};
+
+/** Las claves que la web pública necesita para no publicar un hueco. */
+export const NEGOCIO_REQUERIDO = [
+  'negocio.razonSocial', 'negocio.nif', 'negocio.domicilio', 'negocio.registro',
+] as const;
+
+/** Cuáles de esas siguen sin rellenar. */
+export const negocioPendiente = (settings: SettingsMap): string[] =>
+  NEGOCIO_REQUERIDO.filter((k) => !textOf(settings, k));
 
 /** Which adapter this integration should use. Unknown falls back to the mock. */
 export const adapterOf = (settings: SettingsMap, key: string): AdapterKind => {
