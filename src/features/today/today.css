@@ -1,0 +1,18 @@
+.today { max-width: 820px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
+.today-head { border-bottom: 1px solid var(--border); padding-bottom: var(--space-4);
+  margin-bottom: var(--space-2); }
+/* Inktrap only in the title — the design's rule, and the reason the screen has
+   one voice instead of three. */
+.today h1 { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 var(--space-4); }
+.today-kpis { display: flex; gap: var(--space-6); flex-wrap: wrap; }
+.today-status { color: var(--muted); font-size: .85rem; padding: var(--space-3) 0; }
+.today-clear { font-size: 1rem; color: var(--text); }
+.today-foot { color: var(--muted); font-size: .78rem; margin-top: var(--space-5); }
+.today-undo { background: none; border: 0; padding: 0; font: inherit; color: var(--primary);
+  text-decoration: underline; cursor: pointer; }
+@media (max-width: 620px) {
+  .today-kpis { gap: var(--space-4); }
+  /* The card keeps its anatomy on a phone; only the actions drop below it. */
+  .kit-card { flex-direction: column; align-items: stretch; }
+  .kit-card-actions { justify-content: flex-end; }
+}

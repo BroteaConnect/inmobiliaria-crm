@@ -12,6 +12,7 @@ import Kanban from './crm/Kanban';
 import Propiedades from './crm/Propiedades';
 import Importar from './crm/Importar';
 import Ajustes from './crm/Ajustes';
+import Today from './features/today/Today';
 
 function Nav({ onLogout }: { onLogout: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -37,6 +38,8 @@ function Nav({ onLogout }: { onLogout: () => void }) {
         <span /><span /><span />
       </button>
       <div id="nav-links" className={`links${menuOpen ? ' abierto' : ''}`}>
+        {moduleEnabled(settings, 'modules.today')
+          && <NavLink to="/hoy" onClick={cerrar}>{t('nav.hoy')}</NavLink>}
         {moduleEnabled(settings, 'modules.leads')
           && <NavLink to="/" end onClick={cerrar}>{t('nav.leads')}</NavLink>}
         {moduleEnabled(settings, 'modules.properties')
@@ -103,6 +106,7 @@ function Shell() {
           {/* A module that is off loses its nav entry AND its route: hiding the
               link while the URL still works is a door with the sign taken down.
               Ajustes is never gated — it is where a module is turned back on. */}
+          <Route path="/hoy" element={<Gate module="modules.today"><Today /></Gate>} />
           <Route path="/" element={<Gate module="modules.leads"><Kanban /></Gate>} />
           <Route path="/propiedades" element={<Gate module="modules.properties"><Propiedades /></Gate>} />
           <Route path="/importar" element={<Gate module="modules.imports"><Importar /></Gate>} />

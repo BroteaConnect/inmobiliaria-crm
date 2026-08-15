@@ -65,3 +65,29 @@
   color: var(--muted);
 }
 .kit-chip-on { background: var(--primary); color: var(--primary-contrast); border-color: transparent; }
+
+/* The only red in the system. Bloom Pink is the brand's, and `--accent` is
+   where the theme keeps it. */
+.kit-alert { color: var(--accent); font-size: .78rem; font-weight: 700; }
+
+.kit-card { display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.kit-card-text { flex: 1 1 auto; min-width: 0; }
+.kit-card-signal { margin-bottom: 2px; }
+.kit-card-name { margin: 0; font-size: .95rem; font-weight: 700; }
+/* One line, and it stays one line: the anatomy is the point, and a context that
+   wraps to three lines turns the list back into a wall of text. */
+.kit-card-context { margin: 2px 0 0; font-size: .8rem; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kit-card-actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-2); }
+
+.kit-kpi { display: flex; flex-direction: column; gap: 2px; }
+.kit-kpi-value { font-family: var(--font-sans); font-weight: 800; font-size: 1.6rem;
+  line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
+.kit-kpi-of { font-weight: 600; font-size: 1rem; color: var(--muted); }
+.kit-kpi-label { font-size: .78rem; color: var(--muted); }
+
+.kit-wa { display: inline-flex; align-items: center; gap: .3rem;
+  border-radius: var(--radius); padding: .45rem .9rem; font-size: .82rem; font-weight: 600;
+  background: var(--ok); color: var(--primary-contrast); text-decoration: none; }
+.kit-wa:hover { filter: brightness(1.06); }
