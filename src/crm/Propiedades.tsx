@@ -1,5 +1,7 @@
 import { useI18n } from '../lib/LocaleContext';
 import { useEffect, useRef, useState } from 'react';
+import { useList, useRemoteList } from '../lib/useList';
+import { Pager } from '../components/Pager';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios, buscarPropiedades,
   crearPropiedad, actualizarPropiedad, fotoUrl, fotosUrls, quitarFoto, normalizaFoto, fmtPrecio,
@@ -7,52 +9,39 @@ import {
 
 export default function Propiedades() {
   const { locale, t } = useI18n();
-  const [props, setProps] = useState<Propiedad[]>([]);
   const [owners, setOwners] = useState<Propietario[]>([]);
   const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
   const [enviando, setEnviando] = useState(false);
   const [borrando, setBorrando] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
-  const [busqueda, setBusqueda] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
-  // La consulta vigente, para descartar respuestas obsoletas de búsquedas
-  // anteriores que lleguen desordenadas.
-  const busquedaRef = useRef('');
-  busquedaRef.current = busqueda.trim();
+
+  // Buscar y paginar salen del brick `list`: la guarda de respuestas
+  // desordenadas, el rebote del teclado y el recorte de la página vivían aquí
+  // escritos a mano, y son exactamente los cuatro fallos que ese brick existe
+  // para evitar — el mismo que ocultó 26 leads durante semanas.
+  const remoto = useRemoteList<Propiedad>(
+    (q) => (q ? buscarPropiedades(q) : loadPropiedades()),
+    { minChars: 2 },
+  );
+  const busqueda = remoto.query;
+  const setBusqueda = remoto.setQuery;
+  const props = remoto.items;
+  const pagina = useList(props, { fields: ['titulo', 'municipio', 'direccion'], size: 12 });
 
   const editando = typeof form === 'object' ? form : null;
 
   const recargar = () => {
-    const q = busquedaRef.current;
-    (q.length >= 2 ? buscarPropiedades(q) : loadPropiedades())
-      .then(setProps)
-      .catch((err) => setMsg({ tipo: 'error', texto: t('prop.errorRecargar', { error: (err as Error).message }) }));
+    remoto.reload();
     loadPropietarios().then(setOwners);
   };
   useEffect(() => { loadPropietarios().then(setOwners); }, []);
 
-  // Búsqueda: con 2+ caracteres consulta al servidor (debounce de 300 ms);
-  // con menos, vuelve a la rejilla completa (y carga la inicial al montar).
+  // Un fallo de la búsqueda se cuenta igual que antes: en la misma línea de
+  // aviso que el resto de la pantalla, no en un hueco propio.
   useEffect(() => {
-    const q = busqueda.trim();
-    const fallo = (err: Error) =>
-      setMsg({ tipo: 'error', texto: t('prop.errorBuscar', { error: err.message }) });
-    if (q.length < 2) {
-      // También con guarda de obsolescencia: esta carga sin debounce puede
-      // llegar después que una búsqueda posterior y pisar sus resultados.
-      loadPropiedades()
-        .then((items) => { if (busquedaRef.current.length < 2) setProps(items); })
-        .catch(fallo);
-      return;
-    }
-    // `timer`, no `t`: `t` es la función de traducción de este componente.
-    const timer = setTimeout(() => {
-      buscarPropiedades(q)
-        .then((items) => { if (busquedaRef.current === q) setProps(items); })
-        .catch(fallo);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [busqueda]);
+    if (remoto.error) setMsg({ tipo: 'error', texto: t('prop.errorBuscar', { error: remoto.error.message }) });
+  }, [remoto.error, t]);
 
   // Al abrir en modo edición, lleva el formulario a la vista (la card
   // pulsada puede estar muy abajo en la rejilla).
@@ -249,7 +238,7 @@ export default function Propiedades() {
       )}
 
       <div className="grid">
-        {props.map((p) => (
+        {pagina.items.map((p) => (
           <article key={p.id} className="ficha">
             {fotoUrl(p) ? (
               <div className="portada">
@@ -277,6 +266,10 @@ export default function Propiedades() {
           </article>
         ))}
       </div>
+
+      {/* Doce fichas por pantalla: la rejilla completa de una inmobiliaria en
+          marcha es un scroll infinito en el que nadie encuentra nada. */}
+      <Pager page={pagina} onPage={pagina.setPage} />
     </div>
   );
 }
