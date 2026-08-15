@@ -31,5 +31,7 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
+# Sin esto, /hoy y las demás rutas responden 404: ver nginx.conf.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
