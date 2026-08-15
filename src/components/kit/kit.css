@@ -1,0 +1,67 @@
+/* The kit, in tokens only. Editing a colour here means editing the theme
+   (docs/theme-contract.md) — that is the point of the vocabulary. */
+
+.kit-btn {
+  border-radius: var(--radius);
+  padding: .55rem 1.3rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+/* One per view. The design pairs Electric Violet with dark text rather than
+   white: on this violet, white sits below AA. */
+.kit-btn-primary { background: var(--primary); color: var(--primary-contrast); }
+.kit-btn-primary:hover { filter: brightness(1.08); box-shadow: var(--shadow); }
+.kit-btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.kit-btn-ghost:hover { background: var(--surface); }
+.kit-btn[disabled] { opacity: .5; cursor: default; filter: none; box-shadow: none; }
+
+.kit-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+.kit-toggle.is-disabled { cursor: default; opacity: .6; }
+/* The native control stays in the page and keeps its behaviour; it is the
+   painted track that is decoration, not the other way round. */
+.kit-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.kit-toggle-track {
+  flex: 0 0 auto;
+  width: 42px; height: 24px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background .15s ease;
+  display: block;
+  position: relative;
+}
+.kit-toggle-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: transform .15s ease;
+}
+.kit-toggle input:checked + .kit-toggle-track { background: var(--primary); }
+.kit-toggle input:checked + .kit-toggle-track .kit-toggle-knob { transform: translateX(18px); }
+.kit-toggle input:focus-visible + .kit-toggle-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+.kit-toggle-text { display: flex; flex-direction: column; gap: 2px; }
+.kit-toggle-label { font-weight: 600; }
+/* 12.5px floor from the design, and a muted token that clears its contrast
+   rule — not a lighter grey invented here. */
+.kit-toggle-hint { font-size: .78rem; color: var(--muted); }
+
+.kit-chip {
+  display: inline-block;
+  border-radius: var(--radius);
+  padding: .15rem .6rem;
+  font-size: .78rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.kit-chip-on { background: var(--primary); color: var(--primary-contrast); border-color: transparent; }

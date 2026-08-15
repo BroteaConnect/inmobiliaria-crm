@@ -1,0 +1,12 @@
+.ajustes { max-width: 720px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
+.ajustes h1 { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 var(--space-2); }
+.ajustes h2 { font-size: 1rem; margin: var(--space-6) 0 var(--space-2); }
+.ajustes-intro { color: var(--muted); margin: 0 0 var(--space-3); font-size: .9rem; }
+.ajustes-lista { border-top: 1px solid var(--border); }
+.ajustes-lista > * { border-bottom: 1px solid var(--border); }
+.ajustes-fila { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; }
+.ajustes-fila-texto { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.ajustes-fila-nombre { font-weight: 600; }
+.ajustes-fila-hint { font-size: .78rem; color: var(--muted); }
+.ajustes .aviso { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: var(--space-3); font-size: .85rem; }
