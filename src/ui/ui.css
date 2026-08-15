@@ -1,0 +1,254 @@
+/* The kit's styles. Loaded after crm.css so a kit component wins over the
+ * class it replaces at equal specificity.
+ *
+ * Token-only by contract: not one hex value, rgba() or oklch() below. The
+ * design artifact this comes from declares raw colour inline in 133 places and
+ * names a font it never ships; every one of those was mapped to a token in
+ * styles/identity.css instead of copied.
+ *
+ * The artifact's `style-hover=` and `style-focus=` attributes do not exist in a
+ * browser. They are real :hover and :focus-visible rules here — dropping the
+ * focus ones would have silently removed keyboard navigation from the CRM. */
+
+/* --- buttons: exactly two levels ------------------------------------------ */
+.ui-btn {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: .55rem 1.1rem;
+  min-height: 44px;
+  font-weight: 600;
+  transition: filter .15s ease, transform .15s ease, box-shadow .15s ease,
+    color .15s ease, border-color .15s ease, background .15s ease;
+}
+.ui-btn:disabled { opacity: .4; cursor: default; }
+.ui-btn-primary {
+  background: var(--primary);
+  color: var(--primary-contrast);
+  border: 0;
+}
+.ui-btn-primary:not(:disabled):hover { filter: brightness(1.08); box-shadow: var(--shadow); }
+.ui-btn-primary:not(:disabled):active { transform: translateY(1px); }
+.ui-btn-ghost {
+  background: none;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.ui-btn-ghost:not(:disabled):hover { border-color: var(--primary); color: var(--primary); }
+.ui-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* --- priority: three states ----------------------------------------------- */
+.ui-dots { display: inline-flex; align-items: center; gap: var(--space-2); }
+.ui-dot {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 999px;
+  border: 2px solid var(--signal-low);
+  background: none;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+/* The touch target is ~44px without the dot getting fat: this CRM is used on a
+ * phone between viewings. */
+.ui-dot::after { content: ''; position: absolute; inset: -15px; border-radius: 999px; }
+.ui-dot-high { border-color: var(--signal-high); }
+.ui-dot-medium { border-color: var(--signal-medium); }
+.ui-dot-low { border-color: var(--signal-low); }
+.ui-dot-none { border-color: var(--border); }
+.ui-dot.is-selected.ui-dot-high { background: var(--signal-high); }
+.ui-dot.is-selected.ui-dot-medium { background: var(--signal-medium); }
+.ui-dot.is-selected.ui-dot-low { background: var(--signal-low); }
+button.ui-dot:hover { transform: scale(1.15); }
+button.ui-dot:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+span.ui-dot { cursor: default; }
+
+/* --- the single alert ----------------------------------------------------- */
+.ui-alert {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--alert);
+  background: color-mix(in srgb, var(--alert) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--alert) 40%, transparent);
+  white-space: nowrap;
+}
+
+/* --- chips ---------------------------------------------------------------- */
+.ui-chip {
+  font: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.ui-chip:not(:disabled):hover { color: var(--text); border-color: var(--muted); }
+.ui-chip.is-selected {
+  color: var(--nav-active-contrast);
+  background: var(--nav-active);
+  border-color: var(--nav-active);
+  font-weight: 700;
+}
+.ui-chip:disabled { opacity: .45; cursor: default; }
+.ui-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ui-chip-count { font-variant-numeric: tabular-nums; opacity: .75; }
+.ui-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* --- toggle --------------------------------------------------------------- */
+.ui-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 1rem;
+  padding: var(--space-2) 0;
+}
+.ui-toggle.is-disabled { cursor: default; opacity: .6; }
+/* The checkbox stays in the accessibility tree and keeps every keyboard and
+ * screen-reader behaviour; only its painting is replaced. */
+.ui-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  cursor: inherit;
+}
+.ui-toggle-track {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  display: block;
+  position: relative;
+  transition: background .18s ease, border-color .18s ease;
+}
+.ui-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: transform .18s ease;
+}
+.ui-toggle input:checked ~ .ui-toggle-track { background: var(--primary); border-color: var(--primary); }
+.ui-toggle input:checked ~ .ui-toggle-track .ui-toggle-knob { transform: translateX(18px); }
+.ui-toggle input:focus-visible ~ .ui-toggle-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ui-toggle-text { display: flex; flex-direction: column; gap: 2px; }
+.ui-toggle-label { font-weight: 600; }
+.ui-toggle-hint { color: var(--muted); font-size: .82rem; }
+
+/* --- list card ------------------------------------------------------------ */
+.ui-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: .92rem;
+  transition: border-color .18s ease;
+}
+.ui-card:hover { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+.ui-card.is-alert { border-left: 3px solid var(--alert); }
+.ui-card-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ui-card-title { font-weight: 700; }
+.ui-card-signals { display: inline-flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.ui-card-meta { margin: 0; color: var(--muted); font-size: .82rem; }
+.ui-card-note { margin: 0; color: var(--muted); font-style: italic; font-size: .85rem; }
+.ui-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* --- kpi ------------------------------------------------------------------ */
+.ui-kpis { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.ui-kpi {
+  flex: 1 1 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.ui-kpi-value {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.ui-kpi-label {
+  color: var(--muted);
+  font-size: .76rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* --- whatsapp ------------------------------------------------------------- */
+.ui-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--channel-whatsapp);
+  color: var(--channel-whatsapp-contrast);
+  font-size: .85rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: filter .15s ease;
+}
+.ui-wa:hover { filter: brightness(1.06); }
+.ui-wa:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* --- segmented nav -------------------------------------------------------- */
+.ui-nav { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+.ui-nav-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: .92rem;
+  transition: background .15s ease, color .15s ease;
+}
+.ui-nav-item:hover { background: color-mix(in srgb, var(--nav-active) 12%, transparent); }
+.ui-nav-item.is-current {
+  background: var(--nav-active);
+  color: var(--nav-active-contrast);
+  font-weight: 700;
+}
+.ui-nav-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* The mobile tab bar and the desktop pills are the same control, which is why
+ * this is a media query and not a second component. */
+@media (max-width: 719.98px) {
+  .topnav .ui-nav { flex-direction: column; align-items: stretch; width: 100%; gap: var(--space-1); }
+  .topnav .ui-nav-item { min-height: 44px; border-radius: var(--radius); }
+}

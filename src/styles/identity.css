@@ -1,0 +1,63 @@
+/* Identity tokens — feature 65, "Admin Brotea · Propuestas".
+ *
+ * Loaded AFTER theme.css so these win by cascade order. theme.css is generated
+ * by the factory (`brotea theme brotea`) and must never be edited by hand;
+ * everything this project needs on top of it lives here.
+ *
+ * This file adds only the SEMANTICS the design needs and the brotea theme has
+ * no name for. It deliberately redeclares nothing theme.css owns — no
+ * --font-display, no --primary, no --bg: a second declaration of those is how a
+ * regenerated theme silently stops applying.
+ *
+ * Every token is declared three times — light, the dark media query, and the
+ * explicit [data-theme="dark"] — because the brotea dark palette turns
+ * --primary into acid green (Glow #E6FFA9). A component that assumed "primary
+ * is violet" flips colour for a dark-mode reader, with a green CI. The design
+ * has no dark variant, so the dark values below are this project's decision.
+ */
+
+:root {
+  /* Priority, three states. An INTENSITY ramp of the brand violet, on purpose:
+   * red belongs to --alert and nothing else, so a high-priority lead can never
+   * be confused with an unattended one. */
+  --signal-high: #4B4CC9;
+  --signal-medium: #9B9CE8;
+  --signal-low: #CBCBE4;
+
+  /* The single strong signal of the whole CRM: a lead nobody has answered. */
+  --alert: #D33A2C;
+
+  /* WhatsApp brand green. Its contrast token is dark ink, not white: white on
+   * WhatsApp green is about 1.8:1 and fails every contrast floor there is. */
+  --channel-whatsapp: #25D366;
+  --channel-whatsapp-contrast: #08240F;
+
+  /* The active nav pill. Kept in the violet family in BOTH schemes rather than
+   * following --primary, which would paint it acid green at night. */
+  --nav-active: #5F60D9;
+  --nav-active-contrast: #FFFFFF;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --signal-high: #C6C7FF;
+    --signal-medium: #8788D6;
+    --signal-low: #45456F;
+    --alert: #FF7A6E;
+    --channel-whatsapp: #35E07A;
+    --channel-whatsapp-contrast: #04170A;
+    --nav-active: #B3B4FF;
+    --nav-active-contrast: #09092D;
+  }
+}
+
+:root[data-theme="dark"] {
+  --signal-high: #C6C7FF;
+  --signal-medium: #8788D6;
+  --signal-low: #45456F;
+  --alert: #FF7A6E;
+  --channel-whatsapp: #35E07A;
+  --channel-whatsapp-contrast: #04170A;
+  --nav-active: #B3B4FF;
+  --nav-active-contrast: #09092D;
+}

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './styles/theme.css';
 import './styles/base.css';
 import './crm/crm.css';
+import './components/kit/kit.css';
 import App from './App';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

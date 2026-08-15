@@ -29,7 +29,13 @@ export interface Lead {
 export interface Propietario { id: string; nombre: string; telefono: string; email: string; notas: string }
 
 export type Canal = 'nota' | 'llamada' | 'email' | 'whatsapp' | 'visita';
-export type EstadoEnvio = 'registrado' | 'enviado' | 'entregado' | 'abierto' | 'click' | 'error';
+// 'simulado' is the state of a send that never left: the mock messaging adapter
+// writes it. It gets a value of its own because the digest counters in the
+// sibling repo (jobs/lib.mjs) add up entregado|abierto|click, and a simulation
+// counted as a real delivery is a report that lies. The value itself keeps the
+// Spanish spelling of the select it belongs to — that column is production.
+export type EstadoEnvio =
+  'registrado' | 'enviado' | 'entregado' | 'abierto' | 'click' | 'error' | 'simulado';
 
 export interface Actividad {
   id: string; lead: string; tipo: Canal; nota: string; created: string;
@@ -109,6 +115,17 @@ export async function registrarContacto(
 /** Nota manual: no cuenta como contacto con el cliente. */
 export const anotar = (leadId: string, nota: string) => registrarContacto(leadId, 'nota', nota);
 
+/**
+ * The most recent activities across every lead — what Today needs to know who
+ * wrote last. Bounded on purpose: the queue only cares about the recent past,
+ * and a screen that reads the whole activity log to build a to-do list is a
+ * screen that gets slower every month.
+ */
+export const loadActividadesRecientes = (limit = 200) =>
+  list<Actividad>('actividades', { sort: '-created', perPage: String(limit) })
+    .then((r) => r.items)
+    .catch((): Actividad[] => []);
+
 export const loadActividades = (leadId: string) =>
   list<Actividad>('actividades', { filter: `lead="${leadId}"`, sort: '-created', perPage: '50' })
     .then((r) => r.items);
@@ -153,6 +170,35 @@ export const quitarFoto = (id: string, filename: string) =>
   actualizarPropiedad(id, { 'fotos-': [filename] });
 
 export const onLeadsChange = (cb: () => void) => subscribe(['leads/*'], cb);
+
+// --- configuration (the `settings` collection) --------------------------------
+// One row per key. This project's schema format declares no indexes, so `key`
+// uniqueness cannot be expressed declaratively — it is enforced here instead,
+// by reading before writing.
+//
+// There are NO secrets in here. Any signed-in user can read the collection and
+// the browser bundle is public: `settings` only stores WHICH adapter is
+// selected. Credentials keep following the `enviarEmail` precedent, where the
+// actual send happens in the chassis.
+
+export interface SettingRow { id: string; key: string; value: unknown; note?: string }
+
+/** Every configuration row. The schema for this collection lives in the sibling
+ *  repo, so a not-yet-applied schema answers 404 — that resolves to no rows,
+ *  and the app falls back to the defaults in src/lib/settings.ts. */
+export const loadSettings = () =>
+  listAll<SettingRow>('settings', { sort: 'key' }).catch((): SettingRow[] => []);
+
+/** Write ONE key: update its row if it exists, create it if it does not. */
+export async function saveSetting(key: string, value: unknown, note?: string) {
+  const safe = key.replace(/\\/g, '').replace(/"/g, '\\"');
+  const found = await list<SettingRow>('settings', { filter: `key="${safe}"`, perPage: '1' });
+  const data = { key, value, ...(note !== undefined ? { note } : {}) };
+  const row = found.items[0];
+  return row
+    ? update<SettingRow>('settings', row.id, data)
+    : create<SettingRow>('settings', data);
+}
 
 // Fotos reales de móvil: HEIC (iPhone) no está en la whitelist del backend y
 // las fotos suelen superar los 5 MB. Re-codificamos en cliente a JPEG
