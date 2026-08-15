@@ -298,6 +298,13 @@ export default function Kanban() {
           )}
         >
           {ficha.mensaje && <p className="ficha-mensaje">“{ficha.mensaje}”</p>}
+          {/* Lo que pidió al otro lado: la web ya pregunta cuándo le va bien, y
+              esa respuesta solo sirve si la ve quien va a llamar. */}
+          {ficha.franja && (
+            <p className="ficha-franja">
+              <span>{t('lead.franja')}</span> {t(`lead.franja.${ficha.franja}`)}
+            </p>
+          )}
 
           <h3>{t('lead.prioridadTitulo')}</h3>
           {/* Three states, not five numbers. The design deletes the score
