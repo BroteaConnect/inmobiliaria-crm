@@ -29,6 +29,15 @@
       "services": [
         "supabase-auth"
       ]
+    },
+    "list": {
+      "version": "1.0.0",
+      "files": [
+        "src/components/Pager.tsx",
+        "src/lib/list.d.mts",
+        "src/lib/list.mjs",
+        "src/lib/useList.ts"
+      ]
     }
   },
   "theme": {
