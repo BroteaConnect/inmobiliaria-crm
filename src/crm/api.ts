@@ -22,6 +22,8 @@ export interface Lead {
   id: string; nombre: string; telefono: string; email: string; mensaje: string;
   propiedad: string; etapa: Etapa; origen: string; created: string;
   ultimo_contacto?: string; criterios?: string;
+  /** Franja del día que el lead eligió en la web: mananas | tardes | finde. */
+  franja?: string;
   prioridad?: number; // 1–5; sin valor = sin prioridad
   expand?: { propiedad?: Propiedad };
 }

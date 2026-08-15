@@ -329,6 +329,9 @@ select:focus-visible, textarea:focus-visible {
 .lead-alerta { color: var(--accent); font-weight: 700; }
 
 .ficha-mensaje { margin: 0 0 var(--space-4); font-style: italic; color: var(--muted); }
+.ficha-franja { margin: 0 0 var(--space-4); }
+.ficha-franja span { font-weight: 600; font-size: .75rem; letter-spacing: .08em;
+                     text-transform: uppercase; color: var(--muted); margin-inline-end: var(--space-2); }
 .kit-panel-body h3 { margin: var(--space-5) 0 var(--space-2); font-size: .82rem;
   text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .kit-panel-body h3:first-child { margin-top: 0; }
