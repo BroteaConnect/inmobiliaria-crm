@@ -47,7 +47,12 @@ export const DEFAULTS: SettingsMap = {
   'negocio.telefono': { v: 1, text: '' },
   'negocio.email': { v: 1, text: '' },
   'contacto.whatsapp': { v: 1, text: '' },
+  // La moneda del mercado en el que vende la agencia, en código ISO. Vacío =
+  // AED, que es en lo que estaban los precios antes de que esto fuera un
+  // ajuste: cambiar de moneda no puede ser un efecto secundario de desplegar.
+  'negocio.moneda': { v: 1, text: '' },
 };
+
 
 export const CACHE_KEY = 'crm_settings_v1';
 
@@ -127,6 +132,13 @@ export const moduleEnabled = (settings: SettingsMap, key: string): boolean => {
 export const textOf = (settings: SettingsMap, key: string): string => {
   const value = settings[key];
   return value && 'text' in value ? value.text : '';
+};
+
+/** Código ISO configurado, o el que había si nadie ha puesto uno válido. */
+export const MONEDA_POR_DEFECTO = 'AED';
+export const monedaDe = (settings: SettingsMap): string => {
+  const cod = textOf(settings, 'negocio.moneda').toUpperCase();
+  return /^[A-Z]{3}$/.test(cod) ? cod : MONEDA_POR_DEFECTO;
 };
 
 /** Las claves que la web pública necesita para no publicar un hueco. */

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CACHE_KEY, DEFAULTS, adapterOf, mergeSettings, moduleEnabled, negocioPendiente, readCache, textOf, toRows, writeCache } from './settings';
+import { CACHE_KEY, DEFAULTS, MONEDA_POR_DEFECTO, adapterOf, mergeSettings, moduleEnabled, monedaDe, negocioPendiente, readCache, textOf, toRows, writeCache } from './settings';
 
 const fakeStorage = (seed = {}) => {
   const data = { ...seed };
@@ -138,4 +138,18 @@ test('el JSON guardado como cadena también vale', () => {
   // PocketBase devuelve string si el campo es `text` en vez de `json`.
   const s = mergeSettings([{ key: 'negocio.domicilio', value: '{"v":1,"text":"Calle Mayor 3"}' }]);
   assert.equal(textOf(s, 'negocio.domicilio'), 'Calle Mayor 3');
+});
+
+test('la moneda sale de los ajustes, y sin ajuste queda la que había', () => {
+  assert.equal(monedaDe(mergeSettings([])), MONEDA_POR_DEFECTO);
+  assert.equal(monedaDe(mergeSettings([{ key: 'negocio.moneda', value: { v: 1, text: 'eur' } }])), 'EUR');
+});
+
+test('una moneda que Intl no entendería no llega a Intl', () => {
+  // `new Intl.NumberFormat(l, { currency: '€' })` lanza, y una excepción al
+  // formatear un precio deja la pantalla entera en blanco.
+  for (const malo of ['€', 'euros', 'EU', 'EURO', '123']) {
+    const s = mergeSettings([{ key: 'negocio.moneda', value: { v: 1, text: malo } }]);
+    assert.equal(monedaDe(s), MONEDA_POR_DEFECTO, malo);
+  }
 });

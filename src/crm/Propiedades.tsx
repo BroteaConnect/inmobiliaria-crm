@@ -1,4 +1,6 @@
 import { useI18n } from '../lib/LocaleContext';
+import { useSettings } from '../lib/SettingsContext';
+import { monedaDe } from '../lib/settings';
 import { SidePanel } from '../components/kit/SidePanel';
 import { useEffect, useRef, useState } from 'react';
 import { useList, useRemoteList } from '../lib/useList';
@@ -10,6 +12,7 @@ import {
 
 export default function Propiedades() {
   const { locale, t } = useI18n();
+  const moneda = monedaDe(useSettings().settings);
   const [owners, setOwners] = useState<Propietario[]>([]);
   const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
   const [enviando, setEnviando] = useState(false);
@@ -263,7 +266,7 @@ export default function Propiedades() {
             <button className="cuerpo" onClick={() => setFichaId(p.id)}>
               <strong>{p.titulo}</strong>
               <span className="meta">{t('prop.meta', { municipio: p.municipio, rooms: p.habitaciones ?? '–', area: p.superficie ?? '–' })}</span>
-              <span className="precio">{fmtPrecio(locale, p.precio)}</span>
+              <span className="precio">{fmtPrecio(locale, p.precio, moneda)}</span>
               <span className={`estado estado-${p.estado}`}>{t(`estadoProp.${p.estado}`)}</span>
             </button>
           </article>
@@ -295,7 +298,7 @@ export default function Propiedades() {
             </>
           )}
         >
-          <p className="ficha-precio">{fmtPrecio(locale, ficha.precio)}</p>
+          <p className="ficha-precio">{fmtPrecio(locale, ficha.precio, moneda)}</p>
           <p className={`estado estado-${ficha.estado}`}>{t(`estadoProp.${ficha.estado}`)}</p>
           {ficha.direccion && <p className="ficha-dir">{ficha.direccion}</p>}
           {ficha.descripcion && <p className="ficha-desc">{ficha.descripcion}</p>}

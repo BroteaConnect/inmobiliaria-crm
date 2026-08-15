@@ -35,6 +35,8 @@
   "ajustes.negocio.email.ph": "hello@example.com",
   "ajustes.negocio.falta": "pending",
   "ajustes.negocio.intro": "The public site publishes these: the legal notice, the privacy policy and the footer. Saved when you leave the field.",
+  "ajustes.negocio.moneda": "Currency",
+  "ajustes.negocio.moneda.ph": "AED, EUR, USD…",
   "ajustes.negocio.nif": "Tax ID",
   "ajustes.negocio.nif.ph": "B00000000",
   "ajustes.negocio.pendiente": "{n} details are missing before the site's legal pages are complete.",

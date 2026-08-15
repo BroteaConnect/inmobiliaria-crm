@@ -2,11 +2,11 @@ import { fmtMoney, intlOf, t } from '../lib/i18n';
 // api.ts — typed helpers over the factory's PocketBase client for this CRM.
 import { list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
 
-// Los datos de la clienta operan en dirhams (AED); un único sitio para
-// cambiar de mercado en el futuro.
-// El mercado de la clienta opera en dirhams; Intl decide el formato por idioma.
-export const fmtPrecio = (locale: string, n: number) =>
-  (n != null && Number.isFinite(n) ? fmtMoney(locale, n, 'AED') : '—');
+// La moneda es un dato del negocio (`negocio.moneda` en Ajustes), no una
+// constante: quien pinta el precio la pasa. Intl decide el formato por idioma
+// ("1.234.567 AED" en es, "AED 1,234,567" en en).
+export const fmtPrecio = (locale: string, n: number, moneda: string) =>
+  (n != null && Number.isFinite(n) ? fmtMoney(locale, n, moneda) : '—');
 
 export const ETAPAS = ['nuevo', 'contactado', 'visita', 'oferta', 'reservado', 'vendido', 'nutriendo'] as const;
 export type Etapa = (typeof ETAPAS)[number];
