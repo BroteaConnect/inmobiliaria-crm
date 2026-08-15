@@ -61,3 +61,81 @@ export function Toggle({ checked, onChange, label, hint, disabled }: {
 export function Chip({ tone = 'off', children }: { tone?: 'on' | 'off'; children: ReactNode }) {
   return <span className={`kit-chip kit-chip-${tone}`}>{children}</span>;
 }
+
+/**
+ * The only red signal the system allows.
+ *
+ * The design is strict about this and it is the reason the screen reads at a
+ * glance: at most one per card, and a card showing an alert shows no priority —
+ * two competing severities on one row is two things shouting and nothing heard.
+ */
+export function Alert({ children }: { children: ReactNode }) {
+  return <span className="kit-alert">● {children}</span>;
+}
+
+/**
+ * One anatomy for every list in the CRM: signal, name, one line of context, one
+ * action. Leads, replies, rules and agenda entries are all this.
+ *
+ * `action` is deliberately singular. A row with three buttons is a row that
+ * postpones the decision instead of asking for it.
+ */
+export function ListCard({ signal, name, context, action, extra }: {
+  signal?: ReactNode;
+  name: string;
+  context: string;
+  action: ReactNode;
+  /** A second, lower-weight affordance — the channel button, never a rival. */
+  extra?: ReactNode;
+}) {
+  return (
+    <article className="kit-card">
+      <div className="kit-card-text">
+        {signal && <div className="kit-card-signal">{signal}</div>}
+        <h3 className="kit-card-name">{name}</h3>
+        <p className="kit-card-context">{context}</p>
+      </div>
+      <div className="kit-card-actions">
+        {extra}
+        {action}
+      </div>
+    </article>
+  );
+}
+
+/**
+ * A number that is the message. One variant, no colour, no sparkline: the
+ * design's rule is that the figure carries it and anything else is decoration
+ * competing with the figure.
+ */
+export function Kpi({ label, value, of }: { label: string; value: ReactNode; of?: ReactNode }) {
+  return (
+    <div className="kit-kpi">
+      <span className="kit-kpi-value">{value}{of && <span className="kit-kpi-of"> / {of}</span>}</span>
+      <span className="kit-kpi-label">{label}</span>
+    </div>
+  );
+}
+
+/**
+ * The channel button. It may sit next to the primary because it is not a rival:
+ * it says WHERE the conversation happens, not what the screen wants you to do.
+ *
+ * Green comes from the `ok` token rather than the brand's Node Green, which the
+ * theme vocabulary has no name for (docs/theme-contract.md: extend the
+ * vocabulary, never hardcode). The gap is worth closing in the factory; a hex
+ * typed here would be a colour no theme could ever change.
+ */
+export function WhatsAppButton({ phone, label, message }: {
+  phone: string;
+  label: string;
+  message?: string;
+}) {
+  const digits = phone.replace(/[^\d]/g, '');
+  const href = `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ''}`;
+  return (
+    <a className="kit-wa" href={href} target="_blank" rel="noreferrer" aria-label={label}>
+      <span aria-hidden="true">💬</span> {label}
+    </a>
+  );
+}
