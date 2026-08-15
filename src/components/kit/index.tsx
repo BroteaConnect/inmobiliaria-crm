@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { IconoWhatsApp } from './Icono';
 
 // The consolidated kit from the design's turn 10 — "un solo sistema, 8
 // componentes". This file holds the three the settings screen needs; the rest
@@ -80,16 +81,23 @@ export function Alert({ children }: { children: ReactNode }) {
  * `action` is deliberately singular. A row with three buttons is a row that
  * postpones the decision instead of asking for it.
  */
-export function ListCard({ signal, name, context, action, extra }: {
+export function ListCard({ signal, punto, name, context, action, extra, aplazar, aplazarLabel }: {
   signal?: ReactNode;
+  /** El estado, cuando no hay alerta. Nunca los dos a la vez. */
+  punto?: 'alta' | 'media' | 'baja';
   name: string;
   context: string;
   action: ReactNode;
   /** A second, lower-weight affordance — the channel button, never a rival. */
   extra?: ReactNode;
+  /** Quitar la fila de hoy. Va como aspa, no como tercer botón: es deshacer,
+   *  no una tercera cosa que decidir. */
+  aplazar?: () => void;
+  aplazarLabel?: string;
 }) {
   return (
     <article className="kit-card">
+      {!signal && punto && <span className={`kit-card-punto kit-card-punto--${punto}`} aria-hidden="true" />}
       <div className="kit-card-text">
         {signal && <div className="kit-card-signal">{signal}</div>}
         <h3 className="kit-card-name">{name}</h3>
@@ -98,6 +106,10 @@ export function ListCard({ signal, name, context, action, extra }: {
       <div className="kit-card-actions">
         {extra}
         {action}
+        {aplazar && (
+          <button type="button" className="kit-card-aplazar" onClick={aplazar} title={aplazarLabel}
+            aria-label={aplazarLabel}>×</button>
+        )}
       </div>
     </article>
   );
@@ -135,7 +147,7 @@ export function WhatsAppButton({ phone, label, message }: {
   const href = `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ''}`;
   return (
     <a className="kit-wa" href={href} target="_blank" rel="noreferrer" aria-label={label}>
-      <span aria-hidden="true">💬</span> {label}
+      <IconoWhatsApp /> {label}
     </a>
   );
 }
