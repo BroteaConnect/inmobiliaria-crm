@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
+import { SidePanel } from '../components/kit/SidePanel';
 import {
   ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad,
   anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
@@ -45,6 +46,16 @@ export default function Kanban() {
   const cargarHistorial = async (id: string) => {
     const acts = await loadActividades(id).catch(() => []);
     if (abiertoRef.current === id) setHistorial(acts);
+  };
+
+  /** Open the record. The history is loaded before the panel appears, so it
+   *  never shows the previous lead's contacts for a frame. */
+  const ficha = abierto ? (leads.find((l) => l.id === abierto) ?? null) : null;
+
+  const abrirFicha = async (l: Lead) => {
+    abrir(l.id);
+    setHistorial([]);
+    await cargarHistorial(l.id);
   };
 
   const verHistorial = async (l: Lead) => {
@@ -154,75 +165,98 @@ export default function Kanban() {
             <h2>{t(`etapa.${etapa}`)} <span className="n">{visibles.filter((l) => l.etapa === etapa).length}</span></h2>
             {visibles.filter((l) => l.etapa === etapa).sort(porPrioridad).map((l) => (
               <article key={l.id} className={`lead${desatendido(l) ? ' desatendido' : ''}`}>
-                <strong>{l.nombre}</strong>
-                <div className="prioridad" role="group" aria-label={t('lead.prioridadAria', { nombre: l.nombre })}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} className={l.prioridad === n ? 'activa' : ''}
-                      aria-pressed={l.prioridad === n}
-                      title={l.prioridad === n ? t('lead.quitarPrioridad') : t('lead.prioridadN', { n })}
-                      onClick={() => cambiarPrioridad(l, n)}>{n}</button>
-                  ))}
-                  {!l.prioridad && <span className="sin" title={t('lead.sinPrioridad')}>—</span>}
-                </div>
-                {l.expand?.propiedad && <span className="prop">🏠 {l.expand.propiedad.titulo}</span>}
-                <button className="seguimiento" onClick={() => verHistorial(l)} title={t('lead.historial')}>
-                  {desatendido(l) ? '⚠ ' : ''}{haceCuanto(locale, l.ultimo_contacto)}
+                {/* The card is the design's list anatomy: signal, name, one line
+                    of context, one way in. Everything that used to be crammed
+                    under it — the history, the contact buttons, the note box,
+                    the five priority digits — is in the panel now, which is
+                    where you read a lead instead of squinting at a column. */}
+                <button className="lead-abrir" onClick={() => abrirFicha(l)}>
+                  <strong>{l.nombre}</strong>
+                  <span className="lead-contexto">
+                    {desatendido(l) && <span className="lead-alerta">● </span>}
+                    {l.expand?.propiedad ? `${l.expand.propiedad.titulo} · ` : ''}
+                    {haceCuanto(locale, l.ultimo_contacto)}
+                  </span>
                 </button>
-                {l.mensaje && <p className="msg">“{l.mensaje}”</p>}
-
-                {abierto === l.id && (
-                  <ul className="historial">
-                    {historial.length === 0 && <li className="vacio">{t('lead.sinContactos')}</li>}
-                    {historial.map((a) => (
-                      <li key={a.id}>
-                        <span>{etiquetaCanal(locale, a.tipo)}</span>
-                        <span className="cuando">{haceCuanto(locale, a.created)}</span>
-                        {a.estado_envio && etiquetaEnvio(locale, a.estado_envio) && (
-                          <span className={`envio envio-${a.estado_envio}`}>{etiquetaEnvio(locale, a.estado_envio)}</span>
-                        )}
-                        {a.asunto && <span className="asunto">{a.asunto}</span>}
-                        {a.nota && <span className="texto">{a.nota}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <div className="acciones">
-                  {l.telefono && <a href={`tel:${l.telefono}`} onClick={() => contactar(l, 'llamada')}>📞</a>}
-                  {waLink(l) && (
-                    <a href={waLink(l)} target="_blank" rel="noreferrer" onClick={() => contactar(l, 'whatsapp')}>
-                      💬 WhatsApp
-                    </a>
-                  )}
-                  {l.email && (
-                    <button className="enlace" onClick={() => setEmail({
-                      lead: l,
-                      asunto: l.expand?.propiedad
-                        ? t('email.asuntoPropiedad', { propiedad: l.expand.propiedad.titulo })
-                        : t('email.asuntoGenerico'),
-                      texto: t('email.plantilla', {
-                        nombre: l.nombre,
-                        propiedad: l.expand?.propiedad
-                          ? t('email.plantillaPropiedad', { propiedad: l.expand.propiedad.titulo }) : '',
-                      }),
-                    })}>✉️ Email</button>
-                  )}
-                </div>
 
                 <div className="mover">
                   <button onClick={() => mover(l, -1)} disabled={l.etapa === ETAPAS[0]} aria-label={t('lead.etapaAnterior')}>←</button>
                   <button onClick={() => mover(l, 1)} disabled={l.etapa === ETAPAS[ETAPAS.length - 1]} aria-label={t('lead.etapaSiguiente')}>→</button>
-                </div>
-                <div className="notas">
-                  <input placeholder={t('lead.nota')} value={nota[l.id] ?? ''}
-                    onChange={(e) => setNota((n) => ({ ...n, [l.id]: e.target.value }))}
-                    onKeyDown={(e) => e.key === 'Enter' && guardarNota(l)} />
                 </div>
               </article>
             ))}
           </section>
         ))}
       </div>
+
+      {/* The record, beside the board rather than instead of it. */}
+      {ficha && (
+        <SidePanel
+          open
+          onClose={() => abrir(null)}
+          title={ficha.nombre}
+          subtitle={ficha.expand?.propiedad?.titulo ?? t('filtros.sinPropiedad')}
+          footer={(
+            <>
+              {ficha.telefono && (
+                <a className="kit-btn kit-btn-ghost" href={`tel:${ficha.telefono}`}
+                  onClick={() => contactar(ficha, 'llamada')}>📞 {ficha.telefono}</a>
+              )}
+              {waLink(ficha) && (
+                <a className="kit-wa" href={waLink(ficha)} target="_blank" rel="noreferrer"
+                  onClick={() => contactar(ficha, 'whatsapp')}>💬 WhatsApp</a>
+              )}
+              {ficha.email && (
+                <button className="kit-btn kit-btn-primary" onClick={() => setEmail({
+                  lead: ficha,
+                  asunto: ficha.expand?.propiedad
+                    ? t('email.asuntoPropiedad', { propiedad: ficha.expand.propiedad.titulo })
+                    : t('email.asuntoGenerico'),
+                  texto: t('email.plantilla', {
+                    nombre: ficha.nombre,
+                    propiedad: ficha.expand?.propiedad
+                      ? t('email.plantillaPropiedad', { propiedad: ficha.expand.propiedad.titulo }) : '',
+                  }),
+                })}>✉️ {t('email.enviar')}</button>
+              )}
+            </>
+          )}
+        >
+          {ficha.mensaje && <p className="ficha-mensaje">“{ficha.mensaje}”</p>}
+
+          <h3>{t('lead.prioridadTitulo')}</h3>
+          <div className="prioridad" role="group" aria-label={t('lead.prioridadAria', { nombre: ficha.nombre })}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} className={ficha.prioridad === n ? 'activa' : ''}
+                aria-pressed={ficha.prioridad === n}
+                title={ficha.prioridad === n ? t('lead.quitarPrioridad') : t('lead.prioridadN', { n })}
+                onClick={() => cambiarPrioridad(ficha, n)}>{n}</button>
+            ))}
+            {!ficha.prioridad && <span className="sin" title={t('lead.sinPrioridad')}>—</span>}
+          </div>
+
+          <h3>{t('lead.notaTitulo')}</h3>
+          <input className="ficha-nota" placeholder={t('lead.nota')} value={nota[ficha.id] ?? ''}
+            onChange={(e) => setNota((n) => ({ ...n, [ficha.id]: e.target.value }))}
+            onKeyDown={(e) => e.key === 'Enter' && guardarNota(ficha)} />
+
+          <h3>{t('lead.historial')}</h3>
+          <ul className="historial">
+            {historial.length === 0 && <li className="vacio">{t('lead.sinContactos')}</li>}
+            {historial.map((a) => (
+              <li key={a.id}>
+                <span>{etiquetaCanal(locale, a.tipo)}</span>
+                <span className="cuando">{haceCuanto(locale, a.created)}</span>
+                {a.estado_envio && etiquetaEnvio(locale, a.estado_envio) && (
+                  <span className={`envio envio-${a.estado_envio}`}>{etiquetaEnvio(locale, a.estado_envio)}</span>
+                )}
+                {a.asunto && <span className="asunto">{a.asunto}</span>}
+                {a.nota && <span className="texto">{a.nota}</span>}
+              </li>
+            ))}
+          </ul>
+        </SidePanel>
+      )}
     </>
   );
 }

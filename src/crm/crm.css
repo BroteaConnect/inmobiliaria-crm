@@ -285,3 +285,35 @@ select:focus-visible, textarea:focus-visible {
   /* The column heading repeats what the active chip already says. */
   .kanban .col > h2 { display: none; }
 }
+
+/* The lead card, reduced to the anatomy the design draws: a way in, a name, one
+   line of context. The record itself lives in the side panel. */
+.lead-abrir {
+  display: block; width: 100%; text-align: start;
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.lead-abrir:hover strong { text-decoration: underline; }
+.lead-contexto {
+  display: block; margin-top: 2px; font-size: .78rem; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* The only red on the card, and it replaces nothing else because there is
+   nothing else left to compete with it. */
+.lead-alerta { color: var(--accent); font-weight: 700; }
+
+.ficha-mensaje { margin: 0 0 var(--space-4); font-style: italic; color: var(--muted); }
+.kit-panel-body h3 { margin: var(--space-5) 0 var(--space-2); font-size: .82rem;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.kit-panel-body h3:first-child { margin-top: 0; }
+.ficha-nota { width: 100%; }
+
+/* The property card's body is a button now: same look, one way in. */
+.ficha .cuerpo { width: 100%; text-align: start; background: none; border: 0;
+  font: inherit; color: inherit; cursor: pointer; }
+.ficha .cuerpo:hover strong { text-decoration: underline; }
+
+.ficha-precio { margin: 0; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ficha-dir { margin: var(--space-2) 0 0; color: var(--muted); }
+.ficha-desc { margin: var(--space-3) 0 0; white-space: pre-wrap; }
+.ficha-fotos { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+.ficha-fotos img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--radius); }
