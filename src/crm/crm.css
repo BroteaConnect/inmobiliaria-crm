@@ -32,8 +32,23 @@ select:focus-visible, textarea:focus-visible {
 .topnav .links a { text-decoration: none; color: var(--text); padding: 6px 12px;
   border-radius: 999px; transition: background .15s ease, color .15s ease; }
 .topnav .links a:hover { background: color-mix(in srgb, var(--primary) 10%, transparent); }
-.topnav .links a.active { background: color-mix(in srgb, var(--primary) 14%, transparent);
-  color: var(--primary); font-weight: 700; }
+/* Activo = fondo oscuro y marca luminosa, igual que la barra de pestañas del
+   móvil. Antes era una píldora violeta al 14% con texto violeta: legible, sí,
+   pero es la convención genérica de panel de administración contra la que el
+   diseño argumenta explícitamente. Una sola navegación, un solo estado activo. */
+/* Fondo oscuro y marca luminosa, como lo dibuja el diseño (10b). En modo oscuro
+   `--bg-invert` es blanco, así que ahí se invierte la pareja: la mitad clara y
+   la oscura se intercambian y el contraste se mantiene en los dos esquemas. */
+.topnav .links a.active { background: var(--bg-invert); color: var(--highlight);
+  font-weight: 700; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .topnav .links a.active {
+    background: var(--highlight); color: var(--highlight-contrast);
+  }
+}
+:root[data-theme="dark"] .topnav .links a.active {
+  background: var(--highlight); color: var(--highlight-contrast);
+}
 .topnav .externo { margin-left: auto; font-size: .85rem; color: var(--muted); }
 .topnav .externo:hover { color: var(--primary); background: none; }
 .topnav .salir { background: none; border: 1px solid var(--border);
@@ -217,7 +232,7 @@ select:focus-visible, textarea:focus-visible {
     animation: despliegue .18s ease-out; }
   .topnav .links a { display: flex; align-items: center; min-height: 44px;
     padding: 10px 12px; border-radius: var(--radius); }
-  .topnav .links a.active { background: color-mix(in srgb, var(--primary) 16%, transparent); }
+  .topnav .links a.active { background: var(--bg-invert); color: var(--highlight); }
   .topnav .externo { margin-left: 0; font-size: 1rem; }
   .topnav .salir { margin-top: var(--space-2); min-height: 44px; }
 
@@ -296,6 +311,15 @@ select:focus-visible, textarea:focus-visible {
   background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
 }
 .lead-abrir:hover strong { text-decoration: underline; }
+/* Las flechas mueven de etapa: son el verbo del tablero, no su titular. Antes
+   ocupaban el ancho entero y pesaban más que el nombre del lead, que es
+   exactamente lo que la anatomía del diseño pone primero. */
+.lead .mover { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.lead .mover button { flex: 0 0 auto; width: 32px; height: 28px; padding: 0;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.lead .mover button:hover:not([disabled]) { color: var(--text); border-color: var(--muted); }
+.lead .mover button[disabled] { opacity: .35; cursor: default; }
 .lead-contexto {
   display: block; margin-top: 2px; font-size: .78rem; color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

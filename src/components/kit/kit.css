@@ -74,8 +74,15 @@
 .kit-alert { color: var(--alert); font-size: .78rem; font-weight: 700; }
 
 .kit-card { display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3); }
 .kit-card-text { flex: 1 1 auto; min-width: 0; }
+/* El punto es la señal cuando no hay alerta: dice en qué estado está la fila
+   sin gastar una palabra ni una segunda línea. */
+.kit-card-punto { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--signal-low); }
+.kit-card-punto--alta { background: var(--signal-high); }
+.kit-card-punto--media { background: var(--signal-medium); }
 .kit-card-signal { margin-bottom: 2px; }
 .kit-card-name { margin: 0; font-size: .95rem; font-weight: 700; }
 /* One line, and it stays one line: the anatomy is the point, and a context that
@@ -96,8 +103,7 @@
    "success" and was standing in for a channel. */
 .kit-wa { display: inline-flex; align-items: center; gap: .3rem;
   border-radius: var(--radius); padding: .45rem .9rem; font-size: .82rem; font-weight: 600;
-  background: var(--channel-whatsapp, var(--ground-alt));
-  color: var(--channel-whatsapp-contrast, var(--highlight)); text-decoration: none; }
+  background: var(--ground-alt); color: var(--highlight); text-decoration: none; }
 .kit-wa:hover { filter: brightness(1.06); }
 
 /* The tab bar: the same navigation as the header, in the shape a thumb reaches.
@@ -128,8 +134,16 @@
      about 1.1:1. The pair `highlight` / `highlight-contrast` is legible in both
      because one is always the light half and the other always the dark one. */
   .kit-tab.is-active .kit-tab-icon {
-    background: var(--highlight); color: var(--highlight-contrast);
+    background: var(--bg-invert); color: var(--highlight);
     border-radius: var(--radius); padding: 2px 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .kit-tab.is-active .kit-tab-icon {
+      background: var(--highlight); color: var(--highlight-contrast);
+    }
+  }
+  :root[data-theme="dark"] .kit-tab.is-active .kit-tab-icon {
+    background: var(--highlight); color: var(--highlight-contrast);
   }
   /* Room for the bar, so the last card is never under it. */
   .contenido { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)); }
@@ -184,3 +198,10 @@
   .kit-panel[open] { animation: kit-panel-in .18s ease-out; }
   @keyframes kit-panel-in { from { transform: translateX(2rem); opacity: 0; } to { transform: none; opacity: 1; } }
 }
+
+/* Aplazar es deshacer, no una tercera decisión: un aspa discreta al final de la
+   fila en vez de un botón que compite con la acción. */
+.kit-card-aplazar { flex: 0 0 auto; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: var(--radius); background: none; color: var(--muted);
+  font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.kit-card-aplazar:hover { background: var(--bg); color: var(--text); }

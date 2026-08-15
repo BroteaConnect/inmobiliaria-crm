@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { SidePanel } from '../components/kit/SidePanel';
+import { IconoEmail, IconoTelefono, IconoWhatsApp } from '../components/kit/Icono';
 import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
 import {
   ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad,
@@ -274,11 +275,11 @@ export default function Kanban() {
             <>
               {ficha.telefono && (
                 <a className="kit-btn kit-btn-ghost" href={`tel:${ficha.telefono}`}
-                  onClick={() => contactar(ficha, 'llamada')}>📞 {ficha.telefono}</a>
+                  onClick={() => contactar(ficha, 'llamada')}><IconoTelefono /> {ficha.telefono}</a>
               )}
               {waLink(ficha) && (
                 <a className="kit-wa" href={waLink(ficha)} target="_blank" rel="noreferrer"
-                  onClick={() => contactar(ficha, 'whatsapp')}>💬 WhatsApp</a>
+                  onClick={() => contactar(ficha, 'whatsapp')}><IconoWhatsApp /> WhatsApp</a>
               )}
               {ficha.email && (
                 <button className="kit-btn kit-btn-primary" onClick={() => setEmail({
@@ -291,7 +292,7 @@ export default function Kanban() {
                     propiedad: ficha.expand?.propiedad
                       ? t('email.plantillaPropiedad', { propiedad: ficha.expand.propiedad.titulo }) : '',
                   }),
-                })}>✉️ {t('email.enviar')}</button>
+                })}><IconoEmail /> {t('email.enviar')}</button>
               )}
             </>
           )}

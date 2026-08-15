@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../lib/LocaleContext';
-import { Alert, Button, Kpi, ListCard, WhatsAppButton } from '../../components/kit';
+import { Alert, Kpi, ListCard, WhatsAppButton } from '../../components/kit';
 import {
   loadLeads, loadActividadesRecientes, onLeadsChange, type Actividad, type Lead,
 } from '../../crm/api';
@@ -96,9 +96,14 @@ export default function Today() {
         return (
           <ListCard
             key={item.lead.id}
+            // Un punto de color cuando no hay alerta, y la alerta cuando la hay:
+            // nunca los dos, que es lo que el diseño prohíbe explícitamente.
             signal={fresh
               ? <Alert>{t('today.signal.minutes', { min: String(minutes(item.since)) })}</Alert>
               : undefined}
+            punto={fresh ? undefined : (item.bucket === 'draftReady' ? 'alta' : 'media')}
+            aplazar={() => setDismissed((d) => [...d, item.lead.id])}
+            aplazarLabel={t('today.action.later')}
             name={item.lead.nombre}
             context={contextOf(item)}
             extra={item.lead.telefono
@@ -111,14 +116,12 @@ export default function Today() {
               )
               : undefined}
             action={(
-              <>
-                <Button onClick={() => setDismissed((d) => [...d, item.lead.id])}>
-                  {t('today.action.later')}
-                </Button>
-                <a className="kit-btn kit-btn-primary" href={`/?lead=${item.lead.id}`}>
-                  {t(ACTION_KEY[item.bucket])}
-                </a>
-              </>
+              <a
+                className={`kit-btn kit-btn-${fresh ? 'primary' : 'ghost'}`}
+                href={`/?lead=${item.lead.id}`}
+              >
+                {t(ACTION_KEY[item.bucket])}
+              </a>
             )}
           />
         );
