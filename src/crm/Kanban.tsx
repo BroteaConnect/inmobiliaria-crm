@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { SidePanel } from '../components/kit/SidePanel';
+import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
 import {
   ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad,
   anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
@@ -34,8 +35,9 @@ export default function Kanban() {
     (filtroProp === '' || (filtroProp === 'sin' ? !l.propiedad : l.propiedad === filtroProp)) &&
     coincideLead(l, busqueda));
 
-  const cambiarPrioridad = async (l: Lead, n: number) => {
-    await setPrioridad(l.id, l.prioridad === n ? null : n); // repetir el valor la quita
+  /** `null` limpia la prioridad; el botón activo la manda al pulsarlo otra vez. */
+  const cambiarPrioridad = async (l: Lead, score: number | null) => {
+    await setPrioridad(l.id, score);
     recargar();
   };
 
@@ -225,14 +227,23 @@ export default function Kanban() {
           {ficha.mensaje && <p className="ficha-mensaje">“{ficha.mensaje}”</p>}
 
           <h3>{t('lead.prioridadTitulo')}</h3>
+          {/* Three states, not five numbers. The design deletes the score
+              because the colour already carries it, and a 1–5 ramp asks the
+              agent to invent a difference between a 2 and a 3 that nobody can
+              defend. `leads.prioridad` stays a number underneath (5/3/1), so no
+              data moved and the finer score can come back if it is ever wanted. */}
           <div className="prioridad" role="group" aria-label={t('lead.prioridadAria', { nombre: ficha.nombre })}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} className={ficha.prioridad === n ? 'activa' : ''}
-                aria-pressed={ficha.prioridad === n}
-                title={ficha.prioridad === n ? t('lead.quitarPrioridad') : t('lead.prioridadN', { n })}
-                onClick={() => cambiarPrioridad(ficha, n)}>{n}</button>
-            ))}
-            {!ficha.prioridad && <span className="sin" title={t('lead.sinPrioridad')}>—</span>}
+            {PRIORITY_LEVELS.map((level) => {
+              const activa = levelOf(ficha.prioridad) === level;
+              return (
+                <button key={level} className={`nivel nivel-${level}${activa ? ' activa' : ''}`}
+                  aria-pressed={activa}
+                  onClick={() => cambiarPrioridad(ficha, activa ? null : scoreOf(level))}>
+                  {t(priorityLabelKey(level))}
+                </button>
+              );
+            })}
+            {levelOf(ficha.prioridad) === 'none' && <span className="sin">{t('lead.sinPrioridad')}</span>}
           </div>
 
           <h3>{t('lead.notaTitulo')}</h3>

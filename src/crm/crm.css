@@ -159,10 +159,13 @@ select:focus-visible, textarea:focus-visible {
 .quitar-foto:disabled { opacity: .35; cursor: default; }
 
 /* --- seguimiento de contactos --- */
-.lead.desatendido { border-left: 3px solid var(--warn); }
+/* La tarjeta desatendida ya lleva el punto de alerta en su línea de contexto.
+   El filete ámbar era una segunda señal para lo mismo, en un tercer color: con
+   la alerta, la prioridad y esto, el tablero tenía tres alarmas compitiendo. */
+.lead.desatendido { border-left: 3px solid var(--alert); }
 .lead .seguimiento { align-self: start; background: none; border: 0; padding: 0;
   color: var(--muted); font-size: .78rem; text-decoration: underline dotted; }
-.lead.desatendido .seguimiento { color: var(--warn); font-weight: 700; }
+
 .historial { list-style: none; margin: 2px 0; padding: var(--space-2);
   background: var(--bg); border-radius: var(--radius); font-size: .78rem;
   display: flex; flex-direction: column; gap: 5px; }
@@ -317,3 +320,14 @@ select:focus-visible, textarea:focus-visible {
 .ficha-desc { margin: var(--space-3) 0 0; white-space: pre-wrap; }
 .ficha-fotos { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
 .ficha-fotos img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--radius); }
+
+/* Prioridad en tres estados. El color ES el mensaje: sin número, sin rojo — el
+   rojo pertenece a la alerta y a nada más, que es lo que la hace leerse. */
+.prioridad .nivel { border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--muted); padding: .3rem .8rem;
+  font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.prioridad .nivel.activa { color: var(--bg); border-color: transparent; }
+.prioridad .nivel-high.activa { background: var(--signal-high); }
+.prioridad .nivel-medium.activa { background: var(--signal-medium); }
+.prioridad .nivel-low.activa { background: var(--signal-low); color: var(--text); }
+.prioridad .sin { color: var(--muted); font-size: .8rem; align-self: center; }

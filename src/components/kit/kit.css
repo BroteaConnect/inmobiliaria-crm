@@ -66,9 +66,12 @@
 }
 .kit-chip-on { background: var(--primary); color: var(--primary-contrast); border-color: transparent; }
 
-/* The only red in the system. Bloom Pink is the brand's, and `--accent` is
-   where the theme keeps it. */
-.kit-alert { color: var(--accent); font-size: .78rem; font-weight: 700; }
+/* The only red in the system — and it has to BE red in both schemes. It was
+   `--accent`, which is Bloom Pink in light and a pale violet in dark: at night
+   the one alarm colour was neither red nor distinguishable from the priority
+   ramp. `--alert` (identity.css) is defined for light, dark and high-contrast,
+   and is the token this signal was written for. */
+.kit-alert { color: var(--alert); font-size: .78rem; font-weight: 700; }
 
 .kit-card { display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
@@ -93,7 +96,8 @@
    "success" and was standing in for a channel. */
 .kit-wa { display: inline-flex; align-items: center; gap: .3rem;
   border-radius: var(--radius); padding: .45rem .9rem; font-size: .82rem; font-weight: 600;
-  background: var(--ground-alt); color: var(--highlight); text-decoration: none; }
+  background: var(--channel-whatsapp, var(--ground-alt));
+  color: var(--channel-whatsapp-contrast, var(--highlight)); text-decoration: none; }
 .kit-wa:hover { filter: brightness(1.06); }
 
 /* The tab bar: the same navigation as the header, in the shape a thumb reaches.
@@ -119,8 +123,12 @@
      that now exist for them. Not white with a shadow, which is what every
      other admin panel does and what the design is arguing against. */
   .kit-tab.is-active { color: var(--text); }
+  /* Eggplant and Glow, in that order in light and the other way round in dark.
+     Painting `--bg-invert` was correct in light and put Glow on WHITE at night,
+     about 1.1:1. The pair `highlight` / `highlight-contrast` is legible in both
+     because one is always the light half and the other always the dark one. */
   .kit-tab.is-active .kit-tab-icon {
-    background: var(--bg-invert); color: var(--highlight);
+    background: var(--highlight); color: var(--highlight-contrast);
     border-radius: var(--radius); padding: 2px 10px;
   }
   /* Room for the bar, so the last card is never under it. */
