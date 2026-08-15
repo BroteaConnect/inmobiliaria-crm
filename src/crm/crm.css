@@ -252,3 +252,36 @@ select:focus-visible, textarea:focus-visible {
   padding: var(--space-4); background: var(--surface);
 }
 .login .emergencia h2 { margin: 0 0 var(--space-2); font-size: 1rem; }
+
+/* The mobile pipeline (design 10c). Desktop keeps every column side by side;
+   the chips and the single-column view exist only where the board does not
+   fit, and both come from the same markup — no second board to keep in sync. */
+.etapas-movil { display: none; }
+@media (max-width: 719.98px) {
+  .etapas-movil {
+    display: flex; gap: var(--space-2); overflow-x: auto; padding: var(--space-2) 0;
+    margin-bottom: var(--space-2); scrollbar-width: none;
+  }
+  .etapas-movil::-webkit-scrollbar { display: none; }
+  .etapa-chip {
+    flex: 0 0 auto; min-height: 36px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); color: var(--muted);
+    padding: .3rem .8rem; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
+  }
+  .etapa-chip .n { opacity: .7; font-variant-numeric: tabular-nums; }
+  .etapa-chip.activa { background: var(--text); color: var(--bg); border-color: transparent; }
+  /* One column at a time, chosen by the chips: the sideways scroll is gone and
+     with it the stages nobody knew were there. */
+  .kanban { display: block; }
+  .kanban .col { display: none; }
+  .kanban[data-etapa="nuevo"] .col-nuevo,
+  .kanban[data-etapa="contactado"] .col-contactado,
+  .kanban[data-etapa="visita"] .col-visita,
+  .kanban[data-etapa="oferta"] .col-oferta,
+  .kanban[data-etapa="reservado"] .col-reservado,
+  .kanban[data-etapa="vendido"] .col-vendido,
+  .kanban[data-etapa="nutriendo"] .col-nutriendo { display: block; }
+  /* The column heading repeats what the active chip already says. */
+  .kanban .col > h2 { display: none; }
+}

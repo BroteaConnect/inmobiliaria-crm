@@ -91,3 +91,35 @@
   border-radius: var(--radius); padding: .45rem .9rem; font-size: .82rem; font-weight: 600;
   background: var(--ok); color: var(--primary-contrast); text-decoration: none; }
 .kit-wa:hover { filter: brightness(1.06); }
+
+/* The tab bar: the same navigation as the header, in the shape a thumb reaches.
+   Hidden on desktop, where the header IS this component. */
+.kit-tabs { display: none; }
+@media (max-width: 719.98px) {
+  .kit-tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    display: flex; justify-content: space-around; align-items: stretch;
+    background: var(--surface); border-top: 1px solid var(--border);
+    /* Clears the home indicator on a phone without hardcoding a device. */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .kit-tab {
+    flex: 1 1 0; min-height: 52px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    font: inherit; font-size: .7rem; font-weight: 600;
+    color: var(--muted); text-decoration: none;
+    background: none; border: 0; cursor: pointer;
+  }
+  .kit-tab-icon { font-size: 1.1rem; line-height: 1; }
+  /* Active is the brand's inversion — dark ground, light mark — not white with
+     a shadow. The design names Eggplant + Glow; the theme vocabulary has a name
+     for the first and none for the second (docs/theme-contract.md), so this
+     inverts through tokens rather than typing a hex the theme cannot reach. */
+  .kit-tab.is-active { color: var(--text); }
+  .kit-tab.is-active .kit-tab-icon {
+    background: var(--text); color: var(--bg);
+    border-radius: var(--radius); padding: 2px 10px;
+  }
+  /* Room for the bar, so the last card is never under it. */
+  .contenido { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)); }
+}

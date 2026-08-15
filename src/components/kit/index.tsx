@@ -139,3 +139,52 @@ export function WhatsAppButton({ phone, label, message }: {
     </a>
   );
 }
+
+/**
+ * The eighth component: ONE navigation, in two shapes.
+ *
+ * The design is explicit that the desktop tabs and the mobile tab bar are the
+ * same component — "activo = Eggplant + Glow (tokens de marca, no
+ * blanco+sombra)". Two navigations is how a phone ends up one release behind a
+ * laptop: somebody adds a screen to the header and nobody adds it to the bar.
+ *
+ * `items` are already filtered by the caller: a module that is off has no tab.
+ */
+export function TabBar({ items, more, moreLabel, moreOpen }: {
+  items: { to: string; label: string; icon: string; end?: boolean }[];
+  more: () => void;
+  moreLabel: string;
+  moreOpen: boolean;
+}) {
+  return (
+    <nav className="kit-tabs" aria-label={moreLabel}>
+      {items.map((it) => (
+        <a
+          key={it.to}
+          href={it.to}
+          className={`kit-tab${isCurrent(it) ? ' is-active' : ''}`}
+          aria-current={isCurrent(it) ? 'page' : undefined}
+        >
+          <span className="kit-tab-icon" aria-hidden="true">{it.icon}</span>
+          {it.label}
+        </a>
+      ))}
+      <button
+        type="button"
+        className={`kit-tab${moreOpen ? ' is-active' : ''}`}
+        onClick={more}
+        aria-expanded={moreOpen}
+      >
+        <span className="kit-tab-icon" aria-hidden="true">···</span>
+        {moreLabel}
+      </button>
+    </nav>
+  );
+}
+
+/** Plain location comparison: the bar renders outside the router's context on
+ *  first paint, and a NavLink there throws rather than degrading. */
+function isCurrent(it: { to: string; end?: boolean }) {
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  return it.end ? path === it.to : path === it.to || path.startsWith(`${it.to}/`);
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import {
-  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Lead, type Propiedad,
+  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad,
   anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
   loadPropiedades, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
@@ -19,6 +19,10 @@ export default function Kanban() {
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
   const [filtroProp, setFiltroProp] = useState(''); // '' = todas, 'sin' = sin propiedad, o id
   const [busqueda, setBusqueda] = useState('');
+  // Which column a phone is looking at. On a laptop every column is visible and
+  // this changes nothing — the switch is a CSS media query, so the desktop
+  // board is untouched by it.
+  const [etapaMovil, setEtapaMovil] = useState<Etapa>(ETAPAS[0]);
 
   const recargar = () => loadLeads().then(setLeads).catch(() => {});
   useEffect(() => { recargar(); return onLeadsChange(recargar); }, []);
@@ -124,7 +128,27 @@ export default function Kanban() {
           onChange={(e) => setBusqueda(e.target.value)} aria-label={t('filtros.buscarAria')} />
       </div>
 
-      <div className="kanban">
+      {/* The pipeline on a phone: pick a stage, read one column. A board that
+          scrolls sideways hides the stage you are not looking at behind a
+          gesture nobody discovers. */}
+      <div className="etapas-movil" role="tablist" aria-label={t('filtros.etapaAria')}>
+        {ETAPAS.map((etapa) => {
+          const n = visibles.filter((l) => l.etapa === etapa).length;
+          return (
+            <button
+              key={etapa}
+              role="tab"
+              aria-selected={etapaMovil === etapa}
+              className={`etapa-chip${etapaMovil === etapa ? ' activa' : ''}`}
+              onClick={() => setEtapaMovil(etapa)}
+            >
+              {t(`etapa.${etapa}`)} <span className="n">{n}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="kanban" data-etapa={etapaMovil}>
         {ETAPAS.map((etapa) => (
           <section key={etapa} className={`col col-${etapa}`}>
             <h2>{t(`etapa.${etapa}`)} <span className="n">{visibles.filter((l) => l.etapa === etapa).length}</span></h2>
