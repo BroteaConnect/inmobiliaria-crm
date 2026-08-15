@@ -21,7 +21,7 @@ const MODULES = ['modules.today', 'modules.leads', 'modules.properties', 'module
 // la web pública enseña, no una preferencia del CRM.
 const NEGOCIO = [
   'negocio.razonSocial', 'negocio.nif', 'negocio.domicilio', 'negocio.registro',
-  'negocio.telefono', 'negocio.email', 'contacto.whatsapp',
+  'negocio.telefono', 'negocio.email', 'contacto.whatsapp', 'negocio.moneda',
 ] as const;
 
 const INTEGRATIONS = [

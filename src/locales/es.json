@@ -35,6 +35,8 @@
   "ajustes.negocio.email.ph": "hola@ejemplo.com",
   "ajustes.negocio.falta": "pendiente",
   "ajustes.negocio.intro": "Los publica la web: el aviso legal, la política de privacidad y el pie. Se guardan al salir del campo.",
+  "ajustes.negocio.moneda": "Moneda",
+  "ajustes.negocio.moneda.ph": "AED, EUR, USD…",
   "ajustes.negocio.nif": "NIF",
   "ajustes.negocio.nif.ph": "B00000000",
   "ajustes.negocio.pendiente": "Faltan {n} datos que la web necesita para que sus páginas legales estén completas.",
