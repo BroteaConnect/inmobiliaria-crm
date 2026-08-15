@@ -4,7 +4,7 @@ import { SidePanel } from '../components/kit/SidePanel';
 import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
 import {
   ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad,
-  anotar, coincideLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
+  anotar, coincideLead, crearLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
   loadPropiedades, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
 
@@ -53,6 +53,12 @@ export default function Kanban() {
   /** Open the record. The history is loaded before the panel appears, so it
    *  never shows the previous lead's contacts for a frame. */
   const ficha = abierto ? (leads.find((l) => l.id === abierto) ?? null) : null;
+  // Alta manual. Una agencia en marcha recibe leads por teléfono y por la calle,
+  // y hasta ahora solo podían entrar por el formulario de la web o por un CSV:
+  // el caso más común no tenía puerta.
+  const [nuevo, setNuevo] = useState<{ nombre: string; telefono: string; email: string;
+    propiedad: string; mensaje: string } | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const abrirFicha = async (l: Lead) => {
     abrir(l.id);
@@ -132,6 +138,9 @@ export default function Kanban() {
       )}
 
       <div className="filtros">
+        <button className="kit-btn kit-btn-primary" onClick={() => setNuevo({
+          nombre: '', telefono: '', email: '', propiedad: filtroProp === 'sin' ? '' : filtroProp, mensaje: '',
+        })}>+ {t('lead.nuevo')}</button>
         <select value={filtroProp} onChange={(e) => setFiltroProp(e.target.value)} aria-label={t('filtros.propiedad')}>
           <option value="">{t('filtros.todas')}</option>
           <option value="sin">{t('filtros.sinPropiedad')}</option>
@@ -190,6 +199,69 @@ export default function Kanban() {
           </section>
         ))}
       </div>
+
+      {nuevo && (
+        <SidePanel
+          open
+          onClose={() => setNuevo(null)}
+          title={t('lead.nuevoTitulo')}
+          subtitle={t('lead.nuevoAyuda')}
+          footer={(
+            <button
+              className="kit-btn kit-btn-primary"
+              disabled={guardando || !nuevo.nombre.trim() || !(nuevo.telefono.trim() || nuevo.email.trim())}
+              onClick={async () => {
+                setGuardando(true);
+                try {
+                  // `origen: 'manual'` distingue lo que entra por teléfono de lo
+                  // que entra por la web: sin eso, el informe de procedencia
+                  // cuenta como web algo que nunca pasó por ella.
+                  const creado = await crearLead({
+                    nombre: nuevo.nombre.trim(), telefono: nuevo.telefono.trim(),
+                    email: nuevo.email.trim(), mensaje: nuevo.mensaje.trim(),
+                    propiedad: nuevo.propiedad || undefined, etapa: 'nuevo', origen: 'manual',
+                  });
+                  setNuevo(null);
+                  recargar();
+                  // Se abre la ficha recién creada: quien acaba de colgar el
+                  // teléfono suele querer anotar algo más.
+                  if (creado?.id) abrir(creado.id);
+                } catch (e) {
+                  setAviso(t('lead.nuevoError', { error: (e as Error).message }));
+                } finally {
+                  setGuardando(false);
+                }
+              }}
+            >
+              {guardando ? t('lead.guardando') : t('lead.crear')}
+            </button>
+          )}
+        >
+          <label className="campo">{t('lead.campo.nombre')}
+            <input value={nuevo.nombre} autoFocus
+              onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
+          </label>
+          <label className="campo">{t('lead.campo.telefono')}
+            <input value={nuevo.telefono} inputMode="tel"
+              onChange={(e) => setNuevo({ ...nuevo, telefono: e.target.value })} />
+          </label>
+          <label className="campo">{t('lead.campo.email')}
+            <input value={nuevo.email} type="email"
+              onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })} />
+          </label>
+          <label className="campo">{t('filtros.propiedad')}
+            <select value={nuevo.propiedad}
+              onChange={(e) => setNuevo({ ...nuevo, propiedad: e.target.value })}>
+              <option value="">{t('filtros.sinPropiedad')}</option>
+              {propiedades.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)}
+            </select>
+          </label>
+          <label className="campo">{t('lead.campo.mensaje')}
+            <textarea rows={3} value={nuevo.mensaje}
+              onChange={(e) => setNuevo({ ...nuevo, mensaje: e.target.value })} />
+          </label>
+        </SidePanel>
+      )}
 
       {/* The record, beside the board rather than instead of it. */}
       {ficha && (

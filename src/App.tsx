@@ -14,6 +14,7 @@ import Propiedades from './crm/Propiedades';
 import Importar from './crm/Importar';
 import Ajustes from './crm/Ajustes';
 import Today from './features/today/Today';
+import Informes from './features/informes/Informes';
 
 function Nav({ onLogout }: { onLogout: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -57,6 +58,8 @@ function Nav({ onLogout }: { onLogout: () => void }) {
           && <NavLink to="/propiedades" onClick={cerrar}>{t('nav.propiedades')}</NavLink>}
         {moduleEnabled(settings, 'modules.imports')
           && <NavLink to="/importar" onClick={cerrar}>{t('nav.importar')}</NavLink>}
+        {moduleEnabled(settings, 'modules.reports')
+          && <NavLink to="/informes" onClick={cerrar}>{t('nav.informes')}</NavLink>}
         <NavLink to="/ajustes" onClick={cerrar}>{t('nav.ajustes')}</NavLink>
         {features.filter((f) => !f.hidden).map((f) => (
           <NavLink key={f.path} to={f.path} onClick={cerrar}>{t(f.labelKey)}</NavLink>
@@ -121,6 +124,7 @@ function Shell() {
           <Route path="/" element={<Gate module="modules.leads"><Kanban /></Gate>} />
           <Route path="/propiedades" element={<Gate module="modules.properties"><Propiedades /></Gate>} />
           <Route path="/importar" element={<Gate module="modules.imports"><Importar /></Gate>} />
+          <Route path="/informes" element={<Gate module="modules.reports"><Informes /></Gate>} />
           <Route path="/ajustes" element={<Ajustes />} />
           {features.map((f) => (
             <Route key={f.path} path={f.path} element={f.element} />

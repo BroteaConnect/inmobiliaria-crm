@@ -13,7 +13,7 @@ import './ajustes.css';
 // switch that is off, be looked at by the person who asked for it, and be
 // turned on without a deploy. The alternative is a branch that lives for weeks.
 
-const MODULES = ['modules.today', 'modules.leads', 'modules.properties', 'modules.imports'] as const;
+const MODULES = ['modules.today', 'modules.leads', 'modules.properties', 'modules.imports', 'modules.reports'] as const;
 const INTEGRATIONS = [
   'integrations.messaging',
   'integrations.drafting',
