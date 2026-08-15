@@ -1,4 +1,5 @@
 import { useI18n } from '../lib/LocaleContext';
+import { SidePanel } from '../components/kit/SidePanel';
 import { useEffect, useRef, useState } from 'react';
 import { useList, useRemoteList } from '../lib/useList';
 import { Pager } from '../components/Pager';
@@ -15,6 +16,10 @@ export default function Propiedades() {
   const [borrando, setBorrando] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  // The property being looked at, as an id: the record itself is read back from
+  // the list on every render, so publishing or editing it updates the panel
+  // without a second copy that can disagree.
+  const [fichaId, setFichaId] = useState<string | null>(null);
 
   // Buscar y paginar salen del brick `list`: la guarda de respuestas
   // desordenadas, el rebote del teclado y el recorte de la página vivían aquí
@@ -27,6 +32,7 @@ export default function Propiedades() {
   const busqueda = remoto.query;
   const setBusqueda = remoto.setQuery;
   const props = remoto.items;
+  const ficha = fichaId ? (props.find((p) => p.id === fichaId) ?? null) : null;
   const pagina = useList(props, { fields: ['titulo', 'municipio', 'direccion'], size: 12 });
 
   const editando = typeof form === 'object' ? form : null;
@@ -251,18 +257,15 @@ export default function Propiedades() {
                 </span>
               </div>
             ) : <div className="sinfoto">📷</div>}
-            <div className="cuerpo">
+            {/* One way in, like every other list in this CRM. Publishing and
+                editing are decisions about a property, and you take them
+                looking at the property — not from a grid tile. */}
+            <button className="cuerpo" onClick={() => setFichaId(p.id)}>
               <strong>{p.titulo}</strong>
               <span className="meta">{t('prop.meta', { municipio: p.municipio, rooms: p.habitaciones ?? '–', area: p.superficie ?? '–' })}</span>
               <span className="precio">{fmtPrecio(locale, p.precio)}</span>
               <span className={`estado estado-${p.estado}`}>{t(`estadoProp.${p.estado}`)}</span>
-              {(p.estado === 'borrador' || p.estado === 'publicada') && (
-                <button onClick={() => publicar(p)}>
-                  {p.estado === 'publicada' ? t('prop.retirar') : t('prop.publicar')}
-                </button>
-              )}
-              <button onClick={() => setForm(p)}>{t('prop.editar')}</button>
-            </div>
+            </button>
           </article>
         ))}
       </div>
@@ -270,6 +273,42 @@ export default function Propiedades() {
       {/* Doce fichas por pantalla: la rejilla completa de una inmobiliaria en
           marcha es un scroll infinito en el que nadie encuentra nada. */}
       <Pager page={pagina} onPage={pagina.setPage} />
+
+      {ficha && (
+        <SidePanel
+          open
+          onClose={() => setFichaId(null)}
+          title={ficha.titulo}
+          subtitle={t('prop.meta', {
+            municipio: ficha.municipio, rooms: ficha.habitaciones ?? '–', area: ficha.superficie ?? '–',
+          })}
+          footer={(
+            <>
+              {(ficha.estado === 'borrador' || ficha.estado === 'publicada') && (
+                <button className="kit-btn kit-btn-ghost" onClick={() => publicar(ficha)}>
+                  {ficha.estado === 'publicada' ? t('prop.retirar') : t('prop.publicar')}
+                </button>
+              )}
+              <button className="kit-btn kit-btn-primary" onClick={() => { setForm(ficha); setFichaId(null); }}>
+                {t('prop.editar')}
+              </button>
+            </>
+          )}
+        >
+          <p className="ficha-precio">{fmtPrecio(locale, ficha.precio)}</p>
+          <p className={`estado estado-${ficha.estado}`}>{t(`estadoProp.${ficha.estado}`)}</p>
+          {ficha.direccion && <p className="ficha-dir">{ficha.direccion}</p>}
+          {ficha.descripcion && <p className="ficha-desc">{ficha.descripcion}</p>}
+
+          <h3>{t('prop.campo.fotos')}</h3>
+          {fotosUrls(ficha).length === 0 && <p className="vacio">{t('prop.sinFotos')}</p>}
+          <div className="ficha-fotos">
+            {fotosUrls(ficha).map((src) => (
+              <img key={src} src={src} alt="" loading="lazy" />
+            ))}
+          </div>
+        </SidePanel>
+      )}
     </div>
   );
 }
