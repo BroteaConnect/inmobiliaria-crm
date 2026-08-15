@@ -121,10 +121,10 @@ export function Kpi({ label, value, of }: { label: string; value: ReactNode; of?
  * The channel button. It may sit next to the primary because it is not a rival:
  * it says WHERE the conversation happens, not what the screen wants you to do.
  *
- * Green comes from the `ok` token rather than the brand's Node Green, which the
- * theme vocabulary has no name for (docs/theme-contract.md: extend the
- * vocabulary, never hardcode). The gap is worth closing in the factory; a hex
- * typed here would be a colour no theme could ever change.
+ * Node Green ground with a Glow mark, as the design specifies — and as the
+ * theme can now say: `ground-alt` and `highlight` were added to the vocabulary
+ * for this pair rather than typing the two hexes here, which would have been
+ * two colours no theme could ever change.
  */
 export function WhatsAppButton({ phone, label, message }: {
   phone: string;

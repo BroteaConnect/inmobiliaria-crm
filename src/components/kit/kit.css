@@ -87,9 +87,13 @@
 .kit-kpi-of { font-weight: 600; font-size: 1rem; color: var(--muted); }
 .kit-kpi-label { font-size: .78rem; color: var(--muted); }
 
+/* Node Green ground, Glow mark — the design's own words, and now the theme's:
+   `ground-alt` and `highlight` were added to the vocabulary for exactly this
+   pair (docs/theme-contract.md). It used to be `--ok`, a green that meant
+   "success" and was standing in for a channel. */
 .kit-wa { display: inline-flex; align-items: center; gap: .3rem;
   border-radius: var(--radius); padding: .45rem .9rem; font-size: .82rem; font-weight: 600;
-  background: var(--ok); color: var(--primary-contrast); text-decoration: none; }
+  background: var(--ground-alt); color: var(--highlight); text-decoration: none; }
 .kit-wa:hover { filter: brightness(1.06); }
 
 /* The tab bar: the same navigation as the header, in the shape a thumb reaches.
@@ -111,13 +115,12 @@
     background: none; border: 0; cursor: pointer;
   }
   .kit-tab-icon { font-size: 1.1rem; line-height: 1; }
-  /* Active is the brand's inversion — dark ground, light mark — not white with
-     a shadow. The design names Eggplant + Glow; the theme vocabulary has a name
-     for the first and none for the second (docs/theme-contract.md), so this
-     inverts through tokens rather than typing a hex the theme cannot reach. */
+  /* Eggplant ground, Glow mark — the design's words, written in the tokens
+     that now exist for them. Not white with a shadow, which is what every
+     other admin panel does and what the design is arguing against. */
   .kit-tab.is-active { color: var(--text); }
   .kit-tab.is-active .kit-tab-icon {
-    background: var(--text); color: var(--bg);
+    background: var(--bg-invert); color: var(--highlight);
     border-radius: var(--radius); padding: 2px 10px;
   }
   /* Room for the bar, so the last card is never under it. */
