@@ -38,8 +38,12 @@ export interface BroteaUser {
   id: string;
   email: string;
   name: string;
-  /** Role in THIS app, decided by the bridge from Supabase app_metadata. */
-  role: 'admin' | 'member';
+  /**
+   * Role in THIS app, decided by the bridge from Supabase app_metadata.
+   * Closed and ordered, strongest first — the same set the hook enforces
+   * (feature-templates/auth/pb/hooks/brotea-roles.js).
+   */
+  role: 'superadmin' | 'admin' | 'member';
 }
 
 interface Session {
@@ -114,7 +118,15 @@ const readJson = <T>(key: string): T | null => {
 const session = () => readJson<Session>(SESSION_KEY);
 export const currentUser = (): BroteaUser | null => readJson<BroteaUser>(USER_KEY);
 export const isSignedIn = (): boolean => !!currentUser();
-export const isAdmin = (): boolean => currentUser()?.role === 'admin';
+const RANK: Record<string, number> = { superadmin: 0, admin: 1, member: 2 };
+
+/** Does the signed-in person reach this role? Never a substitute for a rule. */
+export const hasRole = (needed: BroteaUser['role']): boolean => {
+  const have = currentUser()?.role;
+  return have !== undefined && RANK[have] !== undefined && RANK[have] <= RANK[needed];
+};
+
+export const isAdmin = (): boolean => hasRole('admin');
 
 // -- Supabase calls -----------------------------------------------------------
 
