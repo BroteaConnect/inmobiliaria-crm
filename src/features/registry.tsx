@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 // brotea:imports
+import { authSecurity } from './auth/route';
 import { auth } from './auth/route';
 
 export type Feature = {
@@ -18,5 +19,6 @@ export type Feature = {
 // anchors below — do not remove the `brotea:` comment markers.
 export const features: Feature[] = [
   // brotea:register
+  authSecurity,
   auth,
 ];
