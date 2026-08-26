@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/build-stamp.mjs && node --test src/locales/*.test.mjs && tsc --noEmit && vite build",
+    "test": "node scripts/build-stamp.mjs && node --test src/locales/*.test.mjs scripts/*.test.mjs && tsc --noEmit && vite build",
     "prebuild": "node scripts/build-stamp.mjs"
   },
   "dependencies": {
