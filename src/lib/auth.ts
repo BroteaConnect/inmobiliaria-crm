@@ -38,8 +38,12 @@ export interface BroteaUser {
   id: string;
   email: string;
   name: string;
-  /** Role in THIS app, decided by the bridge from Supabase app_metadata. */
-  role: 'admin' | 'member';
+  /**
+   * Role in THIS app, decided by the bridge from Supabase app_metadata.
+   * Closed and ordered, strongest first — the same set the hook enforces
+   * (feature-templates/auth/pb/hooks/brotea-roles.js).
+   */
+  role: 'superadmin' | 'admin' | 'member';
 }
 
 interface Session {
@@ -114,7 +118,15 @@ const readJson = <T>(key: string): T | null => {
 const session = () => readJson<Session>(SESSION_KEY);
 export const currentUser = (): BroteaUser | null => readJson<BroteaUser>(USER_KEY);
 export const isSignedIn = (): boolean => !!currentUser();
-export const isAdmin = (): boolean => currentUser()?.role === 'admin';
+const RANK: Record<string, number> = { superadmin: 0, admin: 1, member: 2 };
+
+/** Does the signed-in person reach this role? Never a substitute for a rule. */
+export const hasRole = (needed: BroteaUser['role']): boolean => {
+  const have = currentUser()?.role;
+  return have !== undefined && RANK[have] !== undefined && RANK[have] <= RANK[needed];
+};
+
+export const isAdmin = (): boolean => hasRole('admin');
 
 // -- Supabase calls -----------------------------------------------------------
 
@@ -175,6 +187,108 @@ export async function bridgeToPocketBase(accessToken: string): Promise<BroteaUse
   return user;
 }
 
+// -- the second factor ---------------------------------------------------------
+//
+// The bridge refuses an `aal1` session from an identity with a verified factor,
+// which is the rule that makes enrolment mean anything. It also means the
+// browser MUST be able to reach `aal2` on its own: without the exchange below,
+// the first person to enrol would be locked out of every app in the fleet, and
+// an enrolment screen shipped alone would be a door that only closes.
+
+export interface Factor {
+  id: string;
+  status: string;
+  factor_type?: string;
+  friendly_name?: string;
+}
+
+/** Raised by a sign-in that got a live session the bridge will not accept yet. */
+export class MfaRequiredError extends AuthError {
+  factorId: string;
+
+  constructor(factorId: string) {
+    super('second factor required', 401);
+    this.factorId = factorId;
+  }
+}
+
+/**
+ * The `aal` the token itself claims. Parsed without verifying, exactly as the
+ * PocketBase hook does and for the same reason: Supabase minted this token and
+ * we are asking what it says about itself, not whether to trust it.
+ */
+function aalOf(accessToken: string): string {
+  try {
+    const body = accessToken.split('.')[1];
+    const json = atob(body.replace(/-/g, '+').replace(/_/g, '/'));
+    return String(JSON.parse(json).aal || 'aal1');
+  } catch {
+    // Unreadable means "not proven aal2", never "fine".
+    return 'aal1';
+  }
+}
+
+const authed = <T>(path: string, accessToken: string, init: RequestInit = {}) =>
+  gotrue<T>(path, {
+    ...init,
+    headers: { Authorization: `Bearer ${accessToken}`, ...(init.headers as object) },
+  });
+
+/** Every factor on this identity, verified or not. */
+export async function listFactors(accessToken = session()?.access_token || ''): Promise<Factor[]> {
+  const user = await authed<{ factors?: Factor[] }>('/user', accessToken);
+  // Supabase OMITS `factors` entirely when there are none. Treating that as an
+  // error locked out every user without MFA on the canary, which is almost
+  // everyone.
+  return Array.isArray(user.factors) ? user.factors : [];
+}
+
+/** Start enrolling a TOTP factor. Returns what the authenticator app needs. */
+export async function enrollTotp(friendlyName: string): Promise<{ id: string; secret: string; uri: string; qr: string }> {
+  const r = await authed<{ id: string; totp?: { secret?: string; uri?: string; qr_code?: string } }>(
+    '/factors',
+    session()?.access_token || '',
+    { method: 'POST', body: JSON.stringify({ factor_type: 'totp', friendly_name: friendlyName }) },
+  );
+  return { id: r.id, secret: r.totp?.secret || '', uri: r.totp?.uri || '', qr: r.totp?.qr_code || '' };
+}
+
+/**
+ * Answer a challenge for a factor and KEEP the session it returns.
+ *
+ * The response is a new, `aal2` token pair: storing it is the whole point, both
+ * when finishing enrolment and when signing in. Returning without storing would
+ * leave the browser holding the aal1 session the bridge refuses.
+ */
+export async function verifyTotp(factorId: string, code: string): Promise<Session> {
+  const token = session()?.access_token || '';
+  const challenge = await authed<{ id: string }>(`/factors/${factorId}/challenge`, token, { method: 'POST' });
+  const upgraded = await authed<TokenResponse>(`/factors/${factorId}/verify`, token, {
+    method: 'POST',
+    body: JSON.stringify({ challenge_id: challenge.id, code }),
+  });
+  return store(upgraded);
+}
+
+/** Finish a sign-in that stopped at MfaRequiredError. */
+export async function completeMfa(factorId: string, code: string): Promise<BroteaUser> {
+  return bridgeToPocketBase((await verifyTotp(factorId, code)).access_token);
+}
+
+export async function unenrollFactor(factorId: string): Promise<void> {
+  await authed(`/factors/${factorId}`, session()?.access_token || '', { method: 'DELETE' });
+}
+
+/**
+ * Is this live session one the bridge will refuse? Returns the factor to
+ * challenge, or null.
+ */
+async function pendingFactor(accessToken: string): Promise<string | null> {
+  if (aalOf(accessToken) === 'aal2') return null;
+  const verified = (await listFactors(accessToken)).filter((f) => f.status === 'verified');
+  return verified.length ? verified[0].id : null;
+}
+
 // -- sign-in flows -------------------------------------------------------------
 
 /** Email + password, the flow that needs no redirect and no provider config. */
@@ -183,7 +297,13 @@ export async function signInWithPassword(email: string, password: string): Promi
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
-  return bridgeToPocketBase(store(token).access_token);
+  const s = store(token);
+  // Ask BEFORE the bridge does. Letting the bridge answer would surface as a
+  // 403 "you have no access", which sends somebody to ask for permissions they
+  // already have instead of opening their authenticator.
+  const factor = await pendingFactor(s.access_token);
+  if (factor) throw new MfaRequiredError(factor);
+  return bridgeToPocketBase(s.access_token);
 }
 
 /**
@@ -293,6 +413,34 @@ export async function withFreshSession<T>(call: () => Promise<T>): Promise<T | n
     const user = await restore();
     if (!user) return null;
     return call();
+  }
+}
+
+// -- the runtime protocol ------------------------------------------------------
+// A brick that wants to react to a session has to listen for something, and
+// until now that something was a string typed by hand in each component. The
+// social calendar grew its own pair (`social:auth`, `social:session-lost`) and
+// its own sign-in form beside this one, because nothing here was named, exported
+// or documented. Two doors into one app is not a duplication of code, it is a
+// duplication of the ATTACK SURFACE — and the second one bypassed the identity
+// plane entirely.
+//
+// So the protocol is exported. `brotea:signedin` carries the BroteaUser;
+// `brotea:signedout` carries nothing and means "there is no session any more",
+// whether a person pressed the button or a request came back 401.
+
+export const SIGNED_IN_EVENT = 'brotea:signedin';
+export const SIGNED_OUT_EVENT = 'brotea:signedout';
+
+/**
+ * Sign out and tell the page. Always use this rather than `signOut()` alone:
+ * without the event the gate stays closed over an app whose every request now
+ * fails, which is a dead end with no way back to the form.
+ */
+export function signOutAndAnnounce(): void {
+  signOut();
+  if (typeof document !== 'undefined') {
+    document.dispatchEvent(new CustomEvent(SIGNED_OUT_EVENT));
   }
 }
 

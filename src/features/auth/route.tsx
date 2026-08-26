@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { Feature } from '../registry';
 import { useI18n } from '../../lib/LocaleContext';
 import { completeCallback, AuthError } from '../../lib/auth';
+import { AuthGate } from './AuthGate';
+import { MfaEnroll } from './MfaEnroll';
 
 /**
  * `/auth/callback` — where Supabase returns after a magic link or a provider
@@ -31,4 +33,20 @@ export const auth: Feature = {
   labelKey: 'auth.title',
   element: <AuthCallback />,
   hidden: true, // a route, not a place anyone navigates to
+};
+
+/**
+ * `/auth/security` — the identity's own second factor. A separate export rather
+ * than a second entry in `auth`, because the registry wire inserts one line per
+ * symbol and an app already carrying `import { auth } …` must keep working: a
+ * widened import line would be inserted BESIDE the old one and bind `auth`
+ * twice.
+ *
+ * Behind the gate on purpose: the second factor of a session nobody has proven
+ * is not a meaningful thing to edit.
+ */
+export const authSecurity: Feature = {
+  path: '/auth/security',
+  labelKey: 'auth.security.link',
+  element: <AuthGate><MfaEnroll /></AuthGate>,
 };

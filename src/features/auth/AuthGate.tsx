@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '../../lib/LocaleContext';
 import {
   AuthError,
+  completeMfa,
   isConfigured,
+  MfaRequiredError,
   restore,
   sendMagicLink,
   signInWithPassword,
@@ -26,6 +28,11 @@ export function AuthGate({ children, role }: { children: ReactNode; role?: Brote
   const [checking, setChecking] = useState(true);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  // The factor waiting for a code. Without this step, the first person in this
+  // app to enrol a second factor is the first person locked out of it: the
+  // bridge refuses an `aal1` session from an identity that has one, and the
+  // identity is fleet-wide — enrolling from any other app is enough.
+  const [factorId, setFactorId] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -52,7 +59,25 @@ export function AuthGate({ children, role }: { children: ReactNode; role?: Brote
     try {
       setUser(await signInWithPassword(String(data.get('email')), String(data.get('password'))));
     } catch (err) {
-      setMsg(explain(err));
+      // The password was right. Anything that reads like a credential error
+      // here sends somebody to reset a password that was fine.
+      if (err instanceof MfaRequiredError) setFactorId(err.factorId);
+      else setMsg(explain(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onCode = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const code = String(new FormData(e.currentTarget).get('code') || '');
+    setMsg('');
+    setBusy(true);
+    try {
+      setUser(await completeMfa(factorId, code));
+    } catch {
+      // A wrong code is not a wrong password: stay on this step.
+      setMsg(t('auth.mfa.error'));
     } finally {
       setBusy(false);
     }
@@ -70,6 +95,27 @@ export function AuthGate({ children, role }: { children: ReactNode; role?: Brote
       setMsg(explain(err));
     }
   };
+
+  if (factorId) {
+    return (
+      <section className="brotea-auth">
+        <h2>{t('auth.mfa.title')}</h2>
+        <p>{t('auth.mfa.hint')}</p>
+        <form onSubmit={onCode}>
+          <label>
+            {t('auth.mfa.code')}
+            <input
+              type="text" name="code" required autoFocus
+              inputMode="numeric" autoComplete="one-time-code"
+              pattern="[0-9]*" maxLength={8}
+            />
+          </label>
+          <button type="submit" disabled={busy}>{t('auth.mfa.submit')}</button>
+          {msg && <p role="alert">{msg}</p>}
+        </form>
+      </section>
+    );
+  }
 
   return (
     <section className="brotea-auth">

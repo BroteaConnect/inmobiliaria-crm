@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "composer": "0.5.0",
+  "composer": "0.6.0",
   "stack": "react",
   "features": {
     "analytics": {
@@ -16,16 +16,25 @@
       ]
     },
     "db": {
-      "version": "1.2.0",
+      "version": "1.3.0",
       "files": [
         "src/lib/pb.ts"
+      ],
+      "collections": [
+        "users"
       ],
       "services": [
         "pocketbase"
       ]
     },
     "auth": {
-      "version": "1.1.0",
+      "version": "1.7.0",
+      "files": [
+        "src/features/auth/AuthGate.tsx",
+        "src/features/auth/MfaEnroll.tsx",
+        "src/features/auth/route.tsx",
+        "src/lib/auth.ts"
+      ],
       "services": [
         "supabase-auth"
       ]
