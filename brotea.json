@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "composer": "0.6.0",
+  "composer": "0.7.0",
   "stack": "react",
   "features": {
     "analytics": {
@@ -52,7 +52,7 @@
   },
   "theme": {
     "name": "brotea",
-    "version": "2.1.0"
+    "version": "2.2.0"
   },
   "service_slugs": {
     "pocketbase": "inmobiliaria"
@@ -80,5 +80,10 @@
     "slug": "inmobiliaria-crm",
     "name": "Inmobiliaria Crm",
     "description": "Inmobiliaria Crm"
+  },
+  "template": {
+    "name": "react",
+    "version": "1.0.0",
+    "owned": "1.2.0"
   }
 }
