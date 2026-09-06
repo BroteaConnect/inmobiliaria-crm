@@ -18,6 +18,15 @@ export interface Propiedad {
   fotos: string[]; propietario: string;
 }
 
+// The delivery channel of a message. Deliberately NOT `Canal`, which is the
+// kind of an activity (nota, llamada, visita...): a template or a campaign can
+// only go out by email or WhatsApp.
+export type CanalMensaje = 'email' | 'whatsapp';
+export type Idioma = 'es' | 'en';
+
+/** A row of the `users` auth collection, as seen through `expand`. */
+export interface Usuario { id: string; email?: string; name?: string }
+
 export interface Lead {
   id: string; nombre: string; telefono: string; email: string; mensaje: string;
   propiedad: string; etapa: Etapa; origen: string; created: string;
@@ -25,10 +34,18 @@ export interface Lead {
   /** Franja del día que el lead eligió en la web: mananas | tardes | finde. */
   franja?: string;
   prioridad?: number; // 1–5; sin valor = sin prioridad
-  expand?: { propiedad?: Propiedad };
+  /** The agent (a `users` row) who owns this lead; empty = unassigned. */
+  asignado?: string;
+  canal_preferido?: CanalMensaje;
+  idioma?: Idioma;
+  expand?: { propiedad?: Propiedad; asignado?: Usuario };
 }
 
-export interface Propietario { id: string; nombre: string; telefono: string; email: string; notas: string }
+export interface Propietario {
+  id: string; nombre: string; telefono: string; email: string; notas: string;
+  /** Marketing consent and the moment it was recorded (ISO date). */
+  consentimiento?: boolean; consentimiento_en?: string;
+}
 
 export type Canal = 'nota' | 'llamada' | 'email' | 'whatsapp' | 'visita';
 // 'simulado' is the state of a send that never left: the mock messaging adapter
@@ -43,6 +60,87 @@ export interface Actividad {
   id: string; lead: string; tipo: Canal; nota: string; created: string;
   direccion?: 'saliente' | 'entrante'; asunto?: string;
   estado_envio?: EstadoEnvio; mensaje_id?: string;
+  /** The campaign that generated this activity, when it was not manual. */
+  campana?: string;
+}
+
+// --- E1 data model: visits, templates, campaigns, deliveries -------------------
+// Types only. Loaders and mutators arrive with the screens that need them
+// (E4/E5); this block exists so that every field the schema declares has a
+// name the CRM can spell.
+
+// A visit as data: who goes where, when, and how it ended. Until now a visit
+// was only an activity kind; the row is what the agenda and the no-show
+// reminders are built on.
+export const VISITA_RESULTADOS =
+  ['pendiente', 'confirmada', 'realizada', 'no_show', 'cancelada', 'reprogramada'] as const;
+export type VisitaResultado = (typeof VISITA_RESULTADOS)[number];
+
+export interface Visita {
+  id: string; lead: string; propiedad: string; agente: string;
+  /** ISO datetime of the appointment. */
+  cuando: string;
+  resultado?: VisitaResultado; notas?: string;
+  created: string; updated: string;
+  expand?: { lead?: Lead; propiedad?: Propiedad; agente?: Usuario };
+}
+
+// A message template in both app languages, with its lifecycle here (estado)
+// and, for WhatsApp, the approval state of its Twilio Content counterpart
+// (content_*): a template can be approved in the CRM and still be pending
+// at Twilio, and the UI has to say so.
+export type PlantillaEstado = 'borrador' | 'aprobada' | 'retirada';
+export type ContentEstado =
+  'unsubmitted' | 'received' | 'pending' | 'approved' | 'rejected' | 'paused' | 'disabled';
+
+export interface Plantilla {
+  id: string; clave: string; nombre: string; canal: CanalMensaje;
+  categoria?: 'utility' | 'marketing';
+  asunto_es?: string; asunto_en?: string;
+  cuerpo_es: string; cuerpo_en: string;
+  /** Placeholder names the body uses, e.g. ['nombre', 'propiedad']. */
+  variables?: string[];
+  /** The lifecycle event that triggers this template automatically, if any. */
+  evento?: string;
+  estado?: PlantillaEstado; version?: number;
+  content_sid?: string; content_estado?: ContentEstado; content_motivo?: string;
+  created: string; updated: string;
+}
+
+// A campaign: one template sent to a segment of leads at a cadence (daily
+// batch, minutes between sends, a time window) from a start date. `informe`
+// is whatever the runner summarises at the end; its shape is the runner's.
+export const CAMPANA_ESTADOS =
+  ['borrador', 'programada', 'en_curso', 'pausada', 'completada', 'cancelada'] as const;
+export type CampanaEstado = (typeof CAMPANA_ESTADOS)[number];
+
+/** Which leads a campaign targets; every field is a filter, an absent one matches all. */
+export interface Segmento {
+  etapa?: Etapa[]; consentimiento?: boolean; origen?: string[];
+  idioma?: Idioma; canal_preferido?: CanalMensaje; asignado?: string;
+}
+
+export interface Campana {
+  id: string; nombre: string; plantilla: string; segmento?: Segmento;
+  lote_diario?: number; intervalo_min?: number;
+  /** Sending window, as "HH:MM". */
+  hora_desde?: string; hora_hasta?: string;
+  inicio?: string; estado?: CampanaEstado; ultimo_envio_en?: string;
+  informe?: unknown;
+  created: string; updated: string;
+}
+
+// Delivery evidence: one row per message that went (or tried to go) out,
+// with the provider id and the timestamps of every state it reached. The
+// activity is what the agent sees; the envio is what the report counts.
+export interface Envio {
+  id: string; lead: string; campana?: string; plantilla?: string; plantilla_version?: number;
+  actividad?: string; canal: CanalMensaje; mensaje_id?: string; estado: EstadoEnvio;
+  /** The values the placeholders were rendered with. */
+  variables?: Record<string, string>;
+  enviado_en?: string; entregado_en?: string; abierto_en?: string; click_en?: string;
+  error_en?: string; error_codigo?: string; error_texto?: string;
+  created: string; updated: string;
 }
 
 // Paging lives in the db brick now: this app had its own copy for exactly one
