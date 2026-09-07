@@ -98,3 +98,31 @@ curl -X POST "$PB/api/collections/actividades/records" \
 
 No schema change was needed for this: notes were always stored in
 `actividades.nota`; previously saved notes simply become visible.
+
+## Owner, channel and language (E1, 2026-09-07)
+
+Three optional fields joined `Lead` in `api.ts` (schema applied via
+BroteaConnect/inmobiliaria#35):
+
+```ts
+asignado?: string;             // id of the `users` row that owns the lead; empty = unassigned
+canal_preferido?: CanalMensaje; // 'email' | 'whatsapp'
+idioma?: Idioma;               // 'es' | 'en'
+expand?: { propiedad?: Propiedad; asignado?: Usuario };
+```
+
+`CanalMensaje` is the delivery channel of a message and is deliberately not
+`Canal`, the activity kind (`nota | llamada | email | whatsapp | visita`): a
+lead can only be written to by email or WhatsApp. Ask for
+`expand: 'asignado'` to get the agent's `Usuario` (`id`, `email?`, `name?`).
+
+```bash
+curl -X PATCH "$PB/api/collections/leads/records/$ID" \
+  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"asignado": "'$USER_ID'", "canal_preferido": "whatsapp", "idioma": "en"}'
+```
+
+The board does not render or edit these fields yet; `loadLeads()` still
+expands only `propiedad`. The full type reference, including the new
+`Visita`, `Plantilla`, `Campana` and `Envio` types, is in
+[docs/crm-types.md](crm-types.md).
