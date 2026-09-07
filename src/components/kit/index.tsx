@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { IconoWhatsApp } from './Icono';
+import { IconClose, IconDots, IconoWhatsApp } from './Icono';
 
 // The consolidated kit from the design's turn 10 — "un solo sistema, 8
 // componentes". This file holds the three the settings screen needs; the rest
@@ -71,7 +71,9 @@ export function Chip({ tone = 'off', children }: { tone?: 'on' | 'off'; children
  * two competing severities on one row is two things shouting and nothing heard.
  */
 export function Alert({ children }: { children: ReactNode }) {
-  return <span className="kit-alert">● {children}</span>;
+  // The dot is drawn in CSS (`.kit-alert::before`), not typed: a `●` is a
+  // glyph whose size and baseline change with the font.
+  return <span className="kit-alert">{children}</span>;
 }
 
 /**
@@ -108,7 +110,7 @@ export function ListCard({ signal, punto, name, context, action, extra, aplazar,
         {action}
         {aplazar && (
           <button type="button" className="kit-card-aplazar" onClick={aplazar} title={aplazarLabel}
-            aria-label={aplazarLabel}>×</button>
+            aria-label={aplazarLabel}><IconClose /></button>
         )}
       </div>
     </article>
@@ -163,7 +165,7 @@ export function WhatsAppButton({ phone, label, message }: {
  * `items` are already filtered by the caller: a module that is off has no tab.
  */
 export function TabBar({ items, more, moreLabel, moreOpen }: {
-  items: { to: string; label: string; icon: string; end?: boolean }[];
+  items: { to: string; label: string; icon: ReactNode; end?: boolean }[];
   more: () => void;
   moreLabel: string;
   moreOpen: boolean;
@@ -187,7 +189,7 @@ export function TabBar({ items, more, moreLabel, moreOpen }: {
         onClick={more}
         aria-expanded={moreOpen}
       >
-        <span className="kit-tab-icon" aria-hidden="true">···</span>
+        <span className="kit-tab-icon" aria-hidden="true"><IconDots size={20} /></span>
         {moreLabel}
       </button>
     </nav>

@@ -4,6 +4,8 @@
 .kit-btn {
   border-radius: var(--radius);
   padding: .55rem 1.3rem;
+  min-height: 2.75rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -34,7 +36,7 @@
   margin-top: 2px;
   border-radius: 999px;
   background: var(--border);
-  transition: background .15s ease;
+  transition: background-color var(--duration-press) var(--ease-out);
   display: block;
   position: relative;
 }
@@ -44,7 +46,7 @@
   border-radius: 999px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  transition: transform .15s ease;
+  transition: transform var(--duration-press) var(--ease-out);
 }
 .kit-toggle input:checked + .kit-toggle-track { background: var(--primary); }
 .kit-toggle input:checked + .kit-toggle-track .kit-toggle-knob { transform: translateX(18px); }
@@ -72,6 +74,8 @@
    ramp. `--alert` (identity.css) is defined for light, dark and high-contrast,
    and is the token this signal was written for. */
 .kit-alert { color: var(--alert); font-size: .78rem; font-weight: 700; }
+.kit-alert::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor; margin-inline-end: 4px; vertical-align: 1px; }
 
 .kit-card { display: flex; align-items: center; gap: var(--space-3);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -124,7 +128,7 @@
     color: var(--muted); text-decoration: none;
     background: none; border: 0; cursor: pointer;
   }
-  .kit-tab-icon { font-size: 1.1rem; line-height: 1; }
+  .kit-tab-icon { display: inline-flex; line-height: 1; }
   /* Eggplant ground, Glow mark — the design's words, written in the tokens
      that now exist for them. Not white with a shadow, which is what every
      other admin panel does and what the design is arguing against. */
@@ -175,9 +179,10 @@
 .kit-panel-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.25rem; }
 .kit-panel-sub { margin: 2px 0 0; font-size: .82rem; color: var(--muted); }
 .kit-panel-close {
-  flex: 0 0 auto; width: 40px; height: 40px; line-height: 1;
+  flex: 0 0 auto; width: 44px; height: 44px; line-height: 1; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface); color: var(--text); font-size: 1.4rem; cursor: pointer;
+  background: var(--surface); color: var(--text); cursor: pointer;
 }
 .kit-panel-close:hover { border-color: var(--muted); }
 /* The body scrolls; the header and the actions do not. Losing the actions
@@ -195,13 +200,17 @@
   .kit-panel { width: 100vw; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .kit-panel[open] { animation: kit-panel-in .18s ease-out; }
+  .kit-panel[open] { animation: kit-panel-in var(--duration-fast) var(--ease-out); }
   @keyframes kit-panel-in { from { transform: translateX(2rem); opacity: 0; } to { transform: none; opacity: 1; } }
 }
 
 /* Aplazar es deshacer, no una tercera decisión: un aspa discreta al final de la
    fila en vez de un botón que compite con la acción. */
-.kit-card-aplazar { flex: 0 0 auto; width: 28px; height: 28px; padding: 0;
+.kit-card-aplazar { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: var(--radius); background: none; color: var(--muted);
-  font-size: 1.1rem; line-height: 1; cursor: pointer; }
+  line-height: 1; cursor: pointer; }
+/* 44px to the finger, 28px to the eye; the extension meets the neighbour's
+   edge (the gap is 8px) without crossing it. */
+.kit-card-aplazar::after { content: ''; position: absolute; inset: -8px; }
 .kit-card-aplazar:hover { background: var(--bg); color: var(--text); }

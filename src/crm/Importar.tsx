@@ -173,7 +173,10 @@ export default function Importar() {
     <div className="importar">
       <h1>{t('imp.titulo')}</h1>
       <p className="ayuda">{t('imp.paso1')} {t('imp.paso2')} {t('imp.paso3')}</p>
-      <input type="file" accept=".csv,text/csv,.tsv" onChange={(e) => e.target.files?.[0] && leer(e.target.files[0])} />
+      <label className="archivo">
+        <span>{t('imp.archivo')}</span>
+        <input type="file" accept=".csv,text/csv,.tsv" onChange={(e) => e.target.files?.[0] && leer(e.target.files[0])} />
+      </label>
       {rows.length > 0 && (
         <>
           <div className="mapa">

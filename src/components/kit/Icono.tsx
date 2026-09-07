@@ -42,3 +42,66 @@ export const IconoEmail = () => (
     <path d="m2 7 10 6 10-6" />
   </svg>
 );
+
+// The rest of the set, added when the glyphs went (E2). `◔ ☰ ⌂ ···` in the tab
+// bar and `← → × ✕ 📷` on the buttons were characters, not icons: each font
+// draws them at its own weight and some fonts do not have them at all. One
+// stroke weight for the whole set, `currentColor` everywhere, `size` in CSS
+// pixels so a tab icon and a button icon come from the same drawing.
+type IconProps = { size?: number };
+const sized = (size: number) => ({ ...base, width: size, height: size });
+
+export const IconClock = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
+export const IconList = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </svg>
+);
+
+export const IconHome = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <path d="M3 11 12 3l9 8" />
+    <path d="M5 10v10h5v-6h4v6h5V10" />
+  </svg>
+);
+
+export const IconDots = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)} fill="currentColor" stroke="none">
+    <circle cx="5" cy="12" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="19" cy="12" r="2" />
+  </svg>
+);
+
+export const IconArrowLeft = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <path d="M19 12H5" />
+    <path d="m12 5-7 7 7 7" />
+  </svg>
+);
+
+export const IconArrowRight = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </svg>
+);
+
+export const IconClose = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
+
+export const IconCamera = ({ size = 16 }: IconProps) => (
+  <svg {...sized(size)}>
+    <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+);

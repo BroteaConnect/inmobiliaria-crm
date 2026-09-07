@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useI18n } from '../../lib/LocaleContext';
+import { IconClose } from './Icono';
 
 // The ninth component: where a detail opens.
 //
@@ -50,7 +51,7 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer }: 
           {subtitle && <p className="kit-panel-sub">{subtitle}</p>}
         </div>
         <button type="button" className="kit-panel-close" onClick={onClose} aria-label={t('panel.cerrar')}>
-          ×
+          <IconClose size={20} />
         </button>
       </header>
       <div className="kit-panel-body">{children}</div>

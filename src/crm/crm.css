@@ -11,11 +11,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-
 input, select, textarea { padding: .55rem; border: 1px solid var(--border);
   border-radius: var(--radius); font: inherit; background: var(--bg); color: var(--text); }
 button { font: inherit; cursor: pointer; }
+/* The press comes from base.css (`scale: var(--press-scale)` with the token
+   transition every button gets); a second transition and a translateY here
+   used to stack on top of it. Tall enough for a thumb. */
 .primario { background: var(--primary); color: var(--primary-contrast); border: 0;
-  border-radius: var(--radius); padding: .55rem 1.3rem; font-weight: 600;
-  transition: filter .15s ease, transform .15s ease, box-shadow .15s ease; }
+  border-radius: var(--radius); padding: .55rem 1.3rem; font-weight: 600; min-height: 2.75rem; }
 .primario:hover { filter: brightness(1.08); box-shadow: var(--shadow); }
-.primario:active { transform: translateY(1px); }
 
 a:focus-visible, button:focus-visible, input:focus-visible,
 select:focus-visible, textarea:focus-visible {
@@ -30,7 +31,9 @@ select:focus-visible, textarea:focus-visible {
 .topnav .marca { font-family: var(--font-display); white-space: nowrap; }
 .topnav .links { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; }
 .topnav .links a { text-decoration: none; color: var(--text); padding: 6px 12px;
-  border-radius: 999px; transition: background .15s ease, color .15s ease; }
+  min-height: 40px; display: inline-flex; align-items: center;
+  border-radius: 999px;
+  transition: background-color var(--duration-press) var(--ease-out), color var(--duration-press) var(--ease-out); }
 .topnav .links a:hover { background: color-mix(in srgb, var(--primary) 10%, transparent); }
 /* Activo = fondo oscuro y marca luminosa, igual que la barra de pestañas del
    móvil. Antes era una píldora violeta al 14% con texto violeta: legible, sí,
@@ -52,14 +55,14 @@ select:focus-visible, textarea:focus-visible {
 .topnav .externo { margin-left: auto; font-size: .85rem; color: var(--muted); }
 .topnav .externo:hover { color: var(--primary); background: none; }
 .topnav .salir { background: none; border: 1px solid var(--border);
-  border-radius: var(--radius); color: var(--muted); padding: 6px 14px;
-  transition: color .15s ease, border-color .15s ease; }
+  border-radius: var(--radius); color: var(--muted); padding: 6px 14px; min-height: 40px; }
 .topnav .salir:hover { color: var(--text); border-color: var(--muted); }
 .menu-btn { display: none; margin-left: auto; width: 44px; height: 44px;
   flex-direction: column; align-items: center; justify-content: center; gap: 5px;
   background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 0; }
 .menu-btn span { display: block; width: 18px; height: 2px; background: var(--text);
-  border-radius: 2px; transition: transform .2s ease, opacity .2s ease; }
+  border-radius: 2px;
+  transition: transform var(--duration-fast) var(--ease-in-out), opacity var(--duration-fast) var(--ease-in-out); }
 .menu-btn[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .menu-btn[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
 .menu-btn[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
@@ -77,42 +80,30 @@ select:focus-visible, textarea:focus-visible {
 .filtros input { flex: 1; min-width: min(240px, 100%); min-height: 44px; }
 
 /* --- kanban --- */
-.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr);
-  gap: var(--space-3); overflow-x: auto; padding-bottom: var(--space-4); align-items: start; }
+/* Seven stages side by side. At 230px a column, a 1280px screen showed five
+   and hid Reserved, Sold and Portfolio behind a sideways scroll nobody
+   discovers; 160px columns with the tighter gap fit the seven in the 1200px
+   container, and a wider screen widens them. Below that the board still
+   scrolls, and snaps so a stage never sits half cut. */
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(160px, 1fr);
+  gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-4); align-items: start;
+  scroll-snap-type: x proximity; }
 .kanban .col { background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-3); display: flex;
-  flex-direction: column; gap: var(--space-3); min-height: 120px; }
+  border-radius: var(--radius-lg); padding: var(--space-2); display: flex;
+  flex-direction: column; gap: var(--space-2); min-height: 120px; scroll-snap-align: start; }
 .kanban h2 { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted); margin: 0; display: flex; justify-content: space-between; }
-.kanban .n { color: var(--primary); }
+  color: var(--muted); margin: 0; display: flex; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) 0; }
+.kanban .n { color: var(--primary); font-variant-numeric: tabular-nums; }
+/* Outer radius = inner radius + padding, so the card sits concentric in its
+   column instead of pinched at the corners. */
 .lead { background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: var(--space-3);
+  border-radius: calc(var(--radius-lg) - var(--space-2)); box-shadow: var(--shadow);
+  padding: var(--space-3); min-width: 0;
   display: flex; flex-direction: column; gap: 6px; font-size: .9rem;
-  transition: border-color .18s ease, box-shadow .18s ease; }
+  transition: border-color var(--duration-press) var(--ease-out), box-shadow var(--duration-press) var(--ease-out); }
 .lead:hover { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
-.lead .prop { color: var(--muted); font-size: .8rem; }
-/* Prioridad 1–5: puntitos compactos para que la card siga entrando a 360 px. */
-.lead .prioridad { display: flex; align-items: center; gap: 6px; }
-.lead .prioridad button { width: 32px; height: 32px; padding: 0; border-radius: 999px;
-  border: 1px solid var(--border); background: var(--bg); color: var(--muted);
-  font-size: .75rem; font-weight: 700; line-height: 1; position: relative;
-  transition: border-color .15s ease, color .15s ease, background .15s ease; }
-/* Zona táctil ampliada (~44px) sin engordar el punto visual: cliente móvil. */
-.lead .prioridad button::after { content: ''; position: absolute; inset: -6px; border-radius: 999px; }
-.lead .prioridad button:hover { border-color: var(--primary); color: var(--primary); }
-.lead .prioridad button.activa { background: var(--primary);
-  color: var(--primary-contrast); border-color: var(--primary); }
-.lead .prioridad .sin { color: var(--muted); font-size: .8rem; margin-left: 2px; }
-.lead .msg { color: var(--muted); font-style: italic; margin: 0; font-size: .85rem; }
-.lead .acciones { display: flex; gap: var(--space-3); }
-.lead .acciones a { text-decoration: none; color: var(--primary); font-size: .85rem; }
-.lead .mover { display: flex; gap: 6px; }
-.lead .mover button { flex: 1; border: 1px solid var(--border); background: var(--bg);
-  color: var(--text); border-radius: var(--radius); padding: 8px 0;
-  transition: border-color .15s ease, color .15s ease; }
-.lead .mover button:not(:disabled):hover { border-color: var(--primary); color: var(--primary); }
-.lead .mover button:disabled { opacity: .35; cursor: default; }
-.lead .notas input { width: 100%; font-size: .85rem; padding: .35rem .5rem; }
+.tablero-estado { color: var(--muted); margin: 0 0 var(--space-3); }
 
 /* --- propiedades --- */
 .barra .buscador { flex: 1; min-width: min(240px, 100%); min-height: 44px; }
@@ -122,16 +113,18 @@ select:focus-visible, textarea:focus-visible {
   gap: var(--space-4); margin-top: var(--space-4); }
 .ficha { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden;
-  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
-.ficha:hover { transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
-  box-shadow: 0 8px 20px rgba(9, 9, 45, 0.12), 0 2px 6px rgba(9, 9, 45, 0.06); }
+  transition: border-color var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); }
+/* The lift is for a pointer; a finger tapping a card does not want it to move. */
+@media (hover: hover) and (pointer: fine) {
+  .ficha:hover { transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+}
 .ficha img { width: 100%; aspect-ratio: 3/2; object-fit: cover; display: block; }
 .sinfoto { aspect-ratio: 3/2; display: grid; place-items: center; font-size: 2rem;
   background: var(--bg); color: var(--muted); }
 .ficha .cuerpo { padding: var(--space-3); display: flex; flex-direction: column; gap: 4px; }
-.ficha .meta { color: var(--muted); font-size: .85rem; }
-.ficha .precio { font-family: var(--font-display); color: var(--primary); }
+.ficha .meta { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.ficha .precio { font-family: var(--font-display); color: var(--primary); font-variant-numeric: tabular-nums; }
 .estado { align-self: start; font-size: .72rem; font-weight: 700; letter-spacing: .05em;
   text-transform: uppercase; border-radius: 999px; padding: 2px 10px; }
 .estado-publicada { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
@@ -151,13 +144,15 @@ select:focus-visible, textarea:focus-visible {
 .alta .acciones { display: flex; gap: var(--space-3); }
 .alta .acciones button:not(.primario) { background: none; color: var(--muted);
   border: 1px solid var(--border); border-radius: var(--radius); padding: .55rem 1.3rem;
-  transition: color .15s ease, border-color .15s ease; }
+  min-height: 2.75rem; }
 .alta .acciones button:not(.primario):hover { color: var(--text); border-color: var(--muted); }
 
 /* --- fotos: contador en la card + tira de miniaturas al editar --- */
 .portada { position: relative; }
 .n-fotos { position: absolute; right: var(--space-2); bottom: var(--space-2);
-  background: rgba(9, 9, 45, 0.65); color: #fff; font-size: .78rem; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: color-mix(in srgb, var(--bg-invert) 65%, transparent); color: var(--text-invert);
+  font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums;
   border-radius: 999px; padding: 3px 10px; pointer-events: none; }
 .fotos-actuales { display: flex; flex-direction: column; gap: var(--space-2); }
 .tira-fotos { list-style: none; margin: 0; padding: 0; display: flex;
@@ -167,9 +162,8 @@ select:focus-visible, textarea:focus-visible {
   border-radius: var(--radius); border: 1px solid var(--border); }
 .quitar-foto { position: absolute; top: 0; right: 0; width: 44px; height: 44px;
   border: 0; padding: 0; display: grid; place-items: center;
-  background: rgba(9, 9, 45, 0.55); color: #fff; font-size: .95rem; line-height: 1;
-  border-radius: 0 var(--radius) 0 var(--radius);
-  transition: background .15s ease; }
+  background: color-mix(in srgb, var(--bg-invert) 55%, transparent); color: var(--text-invert);
+  line-height: 1; border-radius: 0 var(--radius) 0 var(--radius); }
 .quitar-foto:not(:disabled):hover { background: var(--danger); }
 .quitar-foto:disabled { opacity: .35; cursor: default; }
 
@@ -193,9 +187,6 @@ select:focus-visible, textarea:focus-visible {
 .envio { font-weight: 700; }
 .envio-abierto, .envio-click { color: var(--ok); }
 .envio-error { color: var(--danger); }
-.lead .acciones .enlace { background: none; border: 0; padding: 0;
-  color: var(--primary); font-size: .85rem; }
-
 .compositor { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: var(--space-4);
   margin-bottom: var(--space-4); display: flex; flex-direction: column;
@@ -212,6 +203,8 @@ select:focus-visible, textarea:focus-visible {
 
 /* --- importar --- */
 .importar .ayuda { color: var(--muted); max-width: 60ch; }
+.importar .archivo { max-width: 60ch; margin-top: var(--space-3); }
+.importar .archivo input { min-height: 2.75rem; padding: .55rem; cursor: pointer; }
 .mapa { overflow-x: auto; margin-top: var(--space-4); background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .mapa table { border-collapse: collapse; font-size: .85rem; min-width: 100%; }
@@ -229,7 +222,7 @@ select:focus-visible, textarea:focus-visible {
   .topnav .links.abierto { display: flex; flex-direction: column; align-items: stretch;
     flex-basis: 100%; gap: var(--space-1); margin-top: var(--space-3);
     padding-top: var(--space-3); border-top: 1px solid var(--border);
-    animation: despliegue .18s ease-out; }
+    animation: despliegue var(--duration-fast) var(--ease-out); }
   .topnav .links a { display: flex; align-items: center; min-height: 44px;
     padding: 10px 12px; border-radius: var(--radius); }
   .topnav .links a.active { background: var(--bg-invert); color: var(--highlight); }
@@ -238,9 +231,7 @@ select:focus-visible, textarea:focus-visible {
 
   .alta .fila { grid-template-columns: repeat(2, 1fr); }
   .alta .fila2 { grid-template-columns: 1fr; }
-  .kanban { grid-auto-columns: minmax(min(280px, 84vw), 1fr);
-    scroll-snap-type: x proximity; }
-  .kanban .col { scroll-snap-align: start; }
+  .kanban { grid-auto-columns: minmax(min(280px, 84vw), 1fr); }
 }
 
 @media (max-width: 479.98px) {
@@ -261,7 +252,8 @@ select:focus-visible, textarea:focus-visible {
 .login .separador { text-align: center; font-size: .85rem; margin: var(--space-3) 0; }
 .login .aviso { color: var(--ok-strong, var(--ok)); }
 .login .enlace {
-  display: block; margin-top: var(--space-3); padding: 0; border: 0; background: none;
+  display: block; margin-top: var(--space-2); padding: var(--space-2) 0; min-height: 2.75rem;
+  border: 0; background: none;
   color: var(--muted); font: inherit; font-size: .85rem; text-decoration: underline; cursor: pointer;
 }
 .login .enlace:hover { color: var(--primary); }
@@ -282,7 +274,7 @@ select:focus-visible, textarea:focus-visible {
   }
   .etapas-movil::-webkit-scrollbar { display: none; }
   .etapa-chip {
-    flex: 0 0 auto; min-height: 36px;
+    flex: 0 0 auto; min-height: 44px;
     border: 1px solid var(--border); border-radius: var(--radius);
     background: var(--surface); color: var(--muted);
     padding: .3rem .8rem; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
@@ -314,10 +306,16 @@ select:focus-visible, textarea:focus-visible {
 /* Las flechas mueven de etapa: son el verbo del tablero, no su titular. Antes
    ocupaban el ancho entero y pesaban más que el nombre del lead, que es
    exactamente lo que la anatomía del diseño pone primero. */
+.lead-abrir strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lead .mover { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
-.lead .mover button { flex: 0 0 auto; width: 32px; height: 28px; padding: 0;
+/* 44px wide; the height reaches 44 through the pseudo-element so the drawn
+   button stays lighter than the name. The two never overlap: the extension is
+   vertical only and the gap between them is untouched. */
+.lead .mover button { flex: 0 0 auto; width: 44px; height: 36px; padding: 0; position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); border-radius: var(--radius);
   background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.lead .mover button::after { content: ''; position: absolute; inset: -4px 0; }
 .lead .mover button:hover:not([disabled]) { color: var(--text); border-color: var(--muted); }
 .lead .mover button[disabled] { opacity: .35; cursor: default; }
 .lead-contexto {
@@ -325,8 +323,10 @@ select:focus-visible, textarea:focus-visible {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* The only red on the card, and it replaces nothing else because there is
-   nothing else left to compete with it. */
-.lead-alerta { color: var(--accent); font-weight: 700; }
+   nothing else left to compete with it. `--alert` is red in both schemes;
+   `--accent` was pink by day and a pale violet at night. */
+.lead-alerta { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--alert); margin-inline-end: 4px; vertical-align: 1px; }
 
 .ficha-mensaje { margin: 0 0 var(--space-4); font-style: italic; color: var(--muted); }
 .ficha-franja { margin: 0 0 var(--space-4); }
@@ -350,14 +350,19 @@ select:focus-visible, textarea:focus-visible {
 
 /* Prioridad en tres estados. El color ES el mensaje: sin número, sin rojo — el
    rojo pertenece a la alerta y a nada más, que es lo que la hace leerse. */
+.prioridad { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .prioridad .nivel { border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface); color: var(--muted); padding: .3rem .8rem;
+  background: var(--surface); color: var(--muted); padding: .3rem .8rem; min-height: 2.75rem;
   font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
 .prioridad .nivel.activa { color: var(--bg); border-color: transparent; }
 .prioridad .nivel-high.activa { background: var(--signal-high); }
 .prioridad .nivel-medium.activa { background: var(--signal-medium); }
 .prioridad .nivel-low.activa { background: var(--signal-low); color: var(--text); }
 .prioridad .sin { color: var(--muted); font-size: .8rem; align-self: center; }
+
+/* The list brick's pager, at the height a thumb needs. Overridden here rather
+   than edited in Pager.css, which is the brick's copy. */
+.pager button { min-height: 2.75rem; }
 
 /* Campos del alta manual, dentro del panel. */
 .campo { display: block; margin-bottom: var(--space-3); font-weight: 600; font-size: .85rem; }
