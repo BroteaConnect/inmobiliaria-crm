@@ -252,7 +252,7 @@ export default function Propiedades() {
 
       {/* Loading and empty come from the list brick; "no results" keeps its own
           words because it names the search. */}
-      <ListStatus loading={remoto.loading} empty={!remoto.loading && props.length === 0 && busqueda.trim().length < 2} />
+      <ListStatus loading={remoto.loading} empty={!remoto.loading && !remoto.error && props.length === 0 && busqueda.trim().length < 2} />
       {!remoto.loading && busqueda.trim().length >= 2 && props.length === 0 && (
         <p className="sin-resultados">{t('prop.sinResultados', { q: busqueda.trim() })}</p>
       )}

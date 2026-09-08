@@ -299,9 +299,14 @@ select:focus-visible, textarea:focus-visible {
 /* The lead card, reduced to the anatomy the design draws: a way in, a name, one
    line of context. The record itself lives in the side panel. */
 .lead-abrir {
-  display: block; width: 100%; text-align: start;
+  display: block; width: 100%; text-align: start; position: relative;
   background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
 }
+/* The name and its context line are about 34px tall; the tap area reaches 44
+   the same way the arrows do, through a vertical extension that keeps the
+   drawn card exactly as light. It stops 14px short of the arrows' own
+   extension, so a thumb never hits both. */
+.lead-abrir::after { content: ''; position: absolute; inset: -5px 0; }
 .lead-abrir:hover strong { text-decoration: underline; }
 /* Las flechas mueven de etapa: son el verbo del tablero, no su titular. Antes
    ocupaban el ancho entero y pesaban más que el nombre del lead, que es

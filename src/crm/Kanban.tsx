@@ -15,6 +15,9 @@ export default function Kanban() {
   // False until the first answer: an empty board before the load is not an
   // empty pipeline, and the two need different words.
   const [cargado, setCargado] = useState(false);
+  // A failed load is not an empty pipeline either: with the error swallowed the
+  // board would tell an agent with forty leads that there are none.
+  const [fallo, setFallo] = useState<Error | null>(null);
   const [nota, setNota] = useState<Record<string, string>>({});
   const [abierto, setAbierto] = useState<string | null>(null);
   const [historial, setHistorial] = useState<Actividad[]>([]);
@@ -30,7 +33,10 @@ export default function Kanban() {
   // board is untouched by it.
   const [etapaMovil, setEtapaMovil] = useState<Etapa>(ETAPAS[0]);
 
-  const recargar = () => loadLeads().then(setLeads).catch(() => {}).finally(() => setCargado(true));
+  const recargar = () => loadLeads()
+    .then((r) => { setLeads(r); setFallo(null); })
+    .catch((e: unknown) => setFallo(e instanceof Error ? e : new Error(String(e))))
+    .finally(() => setCargado(true));
   useEffect(() => { recargar(); return onLeadsChange(recargar); }, []);
   useEffect(() => { loadPropiedades().then(setPropiedades).catch(() => {}); }, []);
 
@@ -174,10 +180,12 @@ export default function Kanban() {
         })}
       </div>
 
-      {/* Loading keeps the board's shape underneath; the two empties say what
-          comes next: create the first lead, or clear the filter. */}
+      {/* Loading keeps the board's shape underneath; the error says what went
+          wrong; the two empties say what comes next: create the first lead, or
+          clear the filter. An error never reads as an empty pipeline. */}
       {!cargado && <p className="tablero-estado" role="status">{t('list.loading')}</p>}
-      {cargado && leads.length === 0 && <p className="tablero-estado" role="status">{t('lead.vacio')}</p>}
+      {cargado && fallo && <p className="aviso aviso-error" role="alert">{t('list.error', { error: fallo.message })}</p>}
+      {cargado && !fallo && leads.length === 0 && <p className="tablero-estado" role="status">{t('lead.vacio')}</p>}
       {cargado && leads.length > 0 && visibles.length === 0 && (
         <p className="tablero-estado" role="status">{t('lead.sinResultados')}</p>
       )}
@@ -196,7 +204,7 @@ export default function Kanban() {
                 <button className="lead-abrir" onClick={() => abrirFicha(l)}>
                   <strong>{l.nombre}</strong>
                   <span className="lead-contexto">
-                    {desatendido(l) && <span className="lead-alerta" aria-label={t('lead.desatendido')} />}
+                    {desatendido(l) && <span className="lead-alerta" role="img" aria-label={t('lead.desatendido')} />}
                     {l.expand?.propiedad ? `${l.expand.propiedad.titulo} · ` : ''}
                     {haceCuanto(locale, l.ultimo_contacto)}
                   </span>

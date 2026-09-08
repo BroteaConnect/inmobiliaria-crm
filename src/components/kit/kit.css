@@ -16,7 +16,9 @@
 .kit-btn-primary { background: var(--primary); color: var(--primary-contrast); }
 .kit-btn-primary:hover { filter: brightness(1.08); box-shadow: var(--shadow); }
 .kit-btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
-.kit-btn-ghost:hover { background: var(--surface); }
+/* The ghost button often already sits on `--surface` (Login, every panel
+   foot): the border is the cue that survives there, as on the panel close. */
+.kit-btn-ghost:hover { background: var(--surface); border-color: var(--muted); }
 .kit-btn[disabled] { opacity: .5; cursor: default; filter: none; box-shadow: none; }
 
 .kit-toggle {
