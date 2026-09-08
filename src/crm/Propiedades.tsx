@@ -4,7 +4,8 @@ import { monedaDe } from '../lib/settings';
 import { SidePanel } from '../components/kit/SidePanel';
 import { useEffect, useRef, useState } from 'react';
 import { useList, useRemoteList } from '../lib/useList';
-import { Pager } from '../components/Pager';
+import { ListStatus, Pager } from '../components/Pager';
+import { IconCamera, IconClose } from '../components/kit/Icono';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios, buscarPropiedades,
   crearPropiedad, actualizarPropiedad, fotoUrl, fotosUrls, quitarFoto, normalizaFoto, fmtPrecio,
@@ -39,6 +40,13 @@ export default function Propiedades() {
   const pagina = useList(props, { fields: ['titulo', 'municipio', 'direccion'], size: 12 });
 
   const editando = typeof form === 'object' ? form : null;
+  // The one-line summary of a property. Only what is known: a missing count
+  // is left out rather than shown as a dash pretending to be a number.
+  const metaDe = (p: Propiedad) => [
+    p.municipio,
+    p.habitaciones != null && t('prop.meta.rooms', { n: p.habitaciones }),
+    p.superficie != null && t('prop.meta.area', { n: p.superficie }),
+  ].filter(Boolean).join(' · ');
 
   const recargar = () => {
     remoto.reload();
@@ -200,7 +208,7 @@ export default function Propiedades() {
           <label>{t('prop.campo.descripcion')} <textarea name="descripcion" rows={3} defaultValue={editando?.descripcion ?? ''} /></label>
           <label>{t('prop.campo.propietario')}
             <select name="propietario" defaultValue={editando?.propietario ?? ''}>
-              <option value="">—</option>
+              <option value="">{t('prop.sinPropietario')}</option>
               {owners.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
             </select>
           </label>
@@ -223,7 +231,7 @@ export default function Propiedades() {
                         aria-label={t('prop.eliminarFoto', { n: i + 1 })}
                         title={t('prop.eliminarFotoTitle')}
                         onClick={() => borrarFoto(editando, nombre)}
-                      >✕</button>
+                      ><IconClose /></button>
                     </li>
                   ))}
                 </ul>
@@ -242,7 +250,10 @@ export default function Propiedades() {
         </form>
       )}
 
-      {busqueda.trim().length >= 2 && props.length === 0 && (
+      {/* Loading and empty come from the list brick; "no results" keeps its own
+          words because it names the search. */}
+      <ListStatus loading={remoto.loading} empty={!remoto.loading && !remoto.error && props.length === 0 && busqueda.trim().length < 2} />
+      {!remoto.loading && busqueda.trim().length >= 2 && props.length === 0 && (
         <p className="sin-resultados">{t('prop.sinResultados', { q: busqueda.trim() })}</p>
       )}
 
@@ -255,17 +266,17 @@ export default function Propiedades() {
                 {/* La portada (fotos[0]) no cambia al añadir fotos ('fotos+'
                     las pone al final); el contador sí, y es el feedback de
                     que la subida funcionó. */}
-                <span className="n-fotos" title={t('prop.fotos', { count: p.fotos.length })}>
-                  📷 {p.fotos.length}
+                <span className="n-fotos" data-num title={t('prop.fotos', { count: p.fotos.length })}>
+                  <IconCamera size={12} /> {p.fotos.length}
                 </span>
               </div>
-            ) : <div className="sinfoto">📷</div>}
+            ) : <div className="sinfoto" aria-hidden="true"><IconCamera size={32} /></div>}
             {/* One way in, like every other list in this CRM. Publishing and
                 editing are decisions about a property, and you take them
                 looking at the property — not from a grid tile. */}
             <button className="cuerpo" onClick={() => setFichaId(p.id)}>
               <strong>{p.titulo}</strong>
-              <span className="meta">{t('prop.meta', { municipio: p.municipio, rooms: p.habitaciones ?? '–', area: p.superficie ?? '–' })}</span>
+              <span className="meta">{metaDe(p)}</span>
               <span className="precio">{fmtPrecio(locale, p.precio, moneda)}</span>
               <span className={`estado estado-${p.estado}`}>{t(`estadoProp.${p.estado}`)}</span>
             </button>
@@ -282,9 +293,7 @@ export default function Propiedades() {
           open
           onClose={() => setFichaId(null)}
           title={ficha.titulo}
-          subtitle={t('prop.meta', {
-            municipio: ficha.municipio, rooms: ficha.habitaciones ?? '–', area: ficha.superficie ?? '–',
-          })}
+          subtitle={metaDe(ficha)}
           footer={(
             <>
               {(ficha.estado === 'borrador' || ficha.estado === 'publicada') && (

@@ -7,6 +7,7 @@ import { moduleEnabled } from './lib/settings';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import { features } from './features/registry';
 import { TabBar } from './components/kit';
+import { IconClock, IconHome, IconList } from './components/kit/Icono';
 import Login from './crm/Login';
 import { completeCallback, AuthError } from './lib/auth';
 import Kanban from './crm/Kanban';
@@ -27,6 +28,7 @@ function Nav({ onLogout }: { onLogout: () => void }) {
   const cerrar = () => setMenuOpen(false);
 
   return (
+    <>
     <nav className="topnav">
       <strong className="marca">{t('app.brand')}</strong>
       <button
@@ -39,16 +41,6 @@ function Nav({ onLogout }: { onLogout: () => void }) {
       >
         <span /><span /><span />
       </button>
-      <TabBar
-        moreOpen={menuOpen}
-        more={() => setMenuOpen((o) => !o)}
-        moreLabel={t('nav.mas')}
-        items={[
-          moduleEnabled(settings, 'modules.today') && { to: '/hoy', label: t('nav.hoy'), icon: '◔' },
-          moduleEnabled(settings, 'modules.leads') && { to: '/', label: t('nav.leads'), icon: '☰', end: true },
-          moduleEnabled(settings, 'modules.properties') && { to: '/propiedades', label: t('nav.propiedades'), icon: '⌂' },
-        ].filter(Boolean) as { to: string; label: string; icon: string; end?: boolean }[]}
-      />
       <div id="nav-links" className={`links${menuOpen ? ' abierto' : ''}`}>
         {moduleEnabled(settings, 'modules.today')
           && <NavLink to="/hoy" onClick={cerrar}>{t('nav.hoy')}</NavLink>}
@@ -70,6 +62,21 @@ function Nav({ onLogout }: { onLogout: () => void }) {
         <button type="button" className="salir" onClick={onLogout}>{t('nav.salir')}</button>
       </div>
     </nav>
+    {/* Outside the header on purpose. The bar is `position: fixed; bottom: 0`,
+        and the header's `backdrop-filter` makes the header its containing
+        block: inside it, "bottom" meant the bottom of the header, and on every
+        phone the bar sat over the brand and the menu button. */}
+    <TabBar
+      moreOpen={menuOpen}
+      more={() => setMenuOpen((o) => !o)}
+      moreLabel={t('nav.mas')}
+      items={[
+        moduleEnabled(settings, 'modules.today') && { to: '/hoy', label: t('nav.hoy'), icon: <IconClock size={20} /> },
+        moduleEnabled(settings, 'modules.leads') && { to: '/', label: t('nav.leads'), icon: <IconList size={20} />, end: true },
+        moduleEnabled(settings, 'modules.properties') && { to: '/propiedades', label: t('nav.propiedades'), icon: <IconHome size={20} /> },
+      ].filter(Boolean) as { to: string; label: string; icon: React.ReactNode; end?: boolean }[]}
+    />
+    </>
   );
 }
 

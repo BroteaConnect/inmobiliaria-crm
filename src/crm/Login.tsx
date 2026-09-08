@@ -77,7 +77,9 @@ export default function Login({ onOk }: { onOk: () => void }) {
         <button className="primario" type="button" onClick={conGoogle}>{t('auth.google')}</button>
         <p className="separador">{t('auth.or')}</p>
         <label>{t('login.email')} <input name="email" type="email" required autoComplete="username" /></label>
-        <button className="primario" type="submit">{t('auth.magic.submit')}</button>
+        {/* One primary per view: the Brotea account is the way in, the link is
+            the alternative for whoever has no Google. */}
+        <button className="kit-btn kit-btn-ghost" type="submit">{t('auth.magic.submit')}</button>
         {aviso && <p role="status" className="aviso">{aviso}</p>}
         <p role="alert" className="error">{error}</p>
         {!emergencia && (
