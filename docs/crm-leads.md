@@ -185,8 +185,10 @@ curl -X POST "$PB/api/collections/actividades/records" \
 ```
 
   On success the draft is cleared and the history is reloaded with the fresh
-  note on top. On failure a warning is shown (`lead.notaError`) and the
-  draft text is **kept** so nothing is lost.
+  note on top. On failure `lead.notaError` is said inside the open panel (the
+  `SidePanel` `error` prop, `role="alert"` above the footer) and as an error
+  toast, and the draft text is **kept** so nothing is lost. The inline message
+  is cleared when the panel is reopened or another lead opens.
 - **Stale-response guard**: `abiertoRef` tracks which lead's panel is open;
   every activity load is checked against it before painting, so a late
   response can never render another lead's history. Opening a panel first
@@ -200,11 +202,18 @@ curl -X POST "$PB/api/collections/actividades/records" \
 ## Manual lead (`+ New`)
 
 The `+ New` button opens a second `SidePanel` with name, phone, email,
-property (preselected from the active property filter) and message. Create
-is enabled once a name and a phone or email are present; it calls
+property (the ui kit's `Select`, preselected from the active property filter;
+`''` is `filtros.sinPropiedad`) and message. Create is enabled once a name
+and a phone or email are present; it calls
 `crearLead({ …, etapa: 'nuevo', origen: 'manual' })` and opens the new
-record. `origen: 'manual'` keeps phone and walk-in leads out of the "web"
-count in reports.
+record with an empty history, then loads it. `origen: 'manual'` keeps phone
+and walk-in leads out of the "web" count in reports.
+
+- While the create is in flight (`guardando`) the panel refuses to close:
+  Escape and the overlay are ignored, so a panel cannot vanish mid-save and
+  invite a second entry.
+- A failed create (`lead.nuevoError`) is said inside the panel (`error`,
+  `role="alert"`) and as an error toast; the form keeps what was typed.
 
 ## Owner, channel and language (E1, 2026-09-07)
 
