@@ -48,6 +48,26 @@
         "src/lib/list.mjs",
         "src/lib/useList.ts"
       ]
+    },
+    "ui": {
+      "version": "1.2.0",
+      "files": [
+        "src/components/ui/Dialog.tsx",
+        "src/components/ui/Menu.tsx",
+        "src/components/ui/Popover.tsx",
+        "src/components/ui/Select.tsx",
+        "src/components/ui/Sheet.tsx",
+        "src/components/ui/Tabs.tsx",
+        "src/components/ui/Toast.tsx",
+        "src/components/ui/Tooltip.tsx",
+        "src/components/ui/UiProvider.tsx",
+        "src/components/ui/icons.tsx",
+        "src/components/ui/index.ts",
+        "src/components/ui/ui.css"
+      ],
+      "dependencies": [
+        "radix-ui"
+      ]
     }
   },
   "theme": {

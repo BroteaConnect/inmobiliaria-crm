@@ -57,7 +57,7 @@ client-side** over the already-loaded window (no extra requests while typing):
 
 | Control | Values | Effect |
 |---|---|---|
-| Property `<select>` | `''` (all properties) / `'sin'` (no property) / a property id | `'sin'` keeps only leads with an empty `propiedad` relation; an id keeps that property's leads. Options come from `loadPropiedades()`. |
+| Property filter (the ui kit's `Select`, `filtros.propiedad`) | `''` (all properties) / `'sin'` (no property) / a property id | `'sin'` keeps only leads with an empty `propiedad` relation; an id keeps that property's leads. Options come from `loadPropiedades()`. `''` reaches the kit through its empty-value sentinel and comes back as `''`. |
 | Search `<input type="search">` | free text | matched against `nombre`, `email`, `telefono` and `mensaje` via `coincideLead` |
 
 - **Accent + case folding** on both sides of the lead search
@@ -160,7 +160,7 @@ title (or `filtros.sinPropiedad`). The footer holds the contact actions:
 |---|---|---|
 | Call (`kit-btn kit-btn-ghost`, `tel:` link) | `telefono` set | `registrarContacto(id, 'llamada', …)`, then reload |
 | WhatsApp (`kit-wa`, `wa.me` link) | `waLink(l)` non-empty | `registrarContacto(id, 'whatsapp', …)`, then reload |
-| Send email (`kit-btn kit-btn-primary`) | `email` set | opens the `.compositor` above the board; `enviarEmail()` posts to the chassis |
+| Send email (`kit-btn kit-btn-primary`) | `email` set | closes the record and opens the compositor, the ui kit's `Dialog` (subject and message prefilled from `email.*` copy); `enviarEmail()` posts to the chassis; sent or cancelled, the record reopens with its history reloaded. The outcome is a toast (`email.enviado` / `email.error`) |
 
 `registrarContacto` creates the `actividades` row and, for every type except
 `nota`, stamps `leads.ultimo_contacto`, which is what `desatendido()` reads.
@@ -193,8 +193,9 @@ curl -X POST "$PB/api/collections/actividades/records" \
   clears any stale list, then loads.
 - Logging a call/WhatsApp contact while the panel is open reloads the history
   through the same guarded loader.
-- The panel animates in (`kit-panel-in`) and has no exit animation yet; see
-  the known open item in [docs/crm-interface.md](crm-interface.md).
+- The panel is the ui kit's `Sheet` (see [docs/crm-interface.md](crm-interface.md)):
+  it slides in with `--duration-fast`; on close it cuts, because it is mounted
+  conditionally and the board is already there.
 
 ## Manual lead (`+ New`)
 

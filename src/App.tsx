@@ -7,6 +7,7 @@ import { moduleEnabled } from './lib/settings';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import { features } from './features/registry';
 import { TabBar } from './components/kit';
+import { UiProvider } from './components/ui';
 import { IconClock, IconHome, IconList } from './components/kit/Icono';
 import Login from './crm/Login';
 import { completeCallback, AuthError } from './lib/auth';
@@ -146,9 +147,13 @@ function Shell() {
 export default function App() {
   return (
     <LocaleProvider>
-      <SettingsProvider>
-        <Shell />
-      </SettingsProvider>
+      {/* The kit's provider: the toast viewport and the shared tooltip delay.
+          Inside the locale so its two strings follow the language switch. */}
+      <UiProvider>
+        <SettingsProvider>
+          <Shell />
+        </SettingsProvider>
+      </UiProvider>
     </LocaleProvider>
   );
 }

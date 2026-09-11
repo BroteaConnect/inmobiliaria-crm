@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useList, useRemoteList } from '../lib/useList';
 import { ListStatus, Pager } from '../components/Pager';
 import { IconCamera, IconClose } from '../components/kit/Icono';
+import { Tooltip, useToast } from '../components/ui';
 import {
   type Propiedad, type Propietario, loadPropiedades, loadPropietarios, buscarPropiedades,
   crearPropiedad, actualizarPropiedad, fotoUrl, fotosUrls, quitarFoto, normalizaFoto, fmtPrecio,
@@ -18,12 +19,19 @@ export default function Propiedades() {
   const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
   const [enviando, setEnviando] = useState(false);
   const [borrando, setBorrando] = useState<string | null>(null);
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  // Outcomes go to a toast: announced, gone by themselves, never a bar that
+  // pushes the grid down and stays until somebody notices it is stale.
+  const toast = useToast();
+  const avisar = (tipo: 'ok' | 'error', texto: string) => toast({ title: texto, tone: tipo });
   const formRef = useRef<HTMLFormElement>(null);
   // The property being looked at, as an id: the record itself is read back from
   // the list on every render, so publishing or editing it updates the panel
   // without a second copy that can disagree.
   const [fichaId, setFichaId] = useState<string | null>(null);
+  // A failed publish is said inside the open panel too: the panel hides the
+  // toast from assistive technology. Cleared when another record opens.
+  const [fichaError, setFichaError] = useState<string | null>(null);
+  useEffect(() => { setFichaError(null); }, [fichaId]);
 
   // Buscar y paginar salen del brick `list`: la guarda de respuestas
   // desordenadas, el rebote del teclado y el recorte de la página vivían aquí
@@ -57,8 +65,10 @@ export default function Propiedades() {
   // Un fallo de la búsqueda se cuenta igual que antes: en la misma línea de
   // aviso que el resto de la pantalla, no en un hueco propio.
   useEffect(() => {
-    if (remoto.error) setMsg({ tipo: 'error', texto: t('prop.errorBuscar', { error: remoto.error.message }) });
-  }, [remoto.error, t]);
+    // One toast, replaced in place: a search that fails on every keystroke is
+    // one error, not a stack of them.
+    if (remoto.error) toast({ id: 'prop-search', tone: 'error', title: t('prop.errorBuscar', { error: remoto.error.message }) });
+  }, [remoto.error, t, toast]);
 
   // Al abrir en modo edición, lleva el formulario a la vista (la card
   // pulsada puede estar muy abajo en la rejilla).
@@ -73,7 +83,9 @@ export default function Propiedades() {
       await actualizarPropiedad(p.id, { estado: p.estado === 'publicada' ? 'borrador' : 'publicada' });
       recargar();
     } catch (err) {
-      setMsg({ tipo: 'error', texto: t('prop.errorEstado', { error: (err as Error).message }) });
+      const msg = t('prop.errorEstado', { error: (err as Error).message });
+      setFichaError(msg);
+      avisar('error', msg);
     }
   };
 
@@ -84,7 +96,6 @@ export default function Propiedades() {
   const borrarFoto = async (p: Propiedad, nombre: string) => {
     if (borrando) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
     if (!confirm(t('prop.confirmarFoto'))) return;
-    setMsg(null);
     setBorrando(nombre);
     try {
       const actualizada = await quitarFoto(p.id, nombre);
@@ -93,7 +104,7 @@ export default function Propiedades() {
       setForm((f) => (typeof f === 'object' && f.id === actualizada.id ? actualizada : f));
       recargar();
     } catch (err) {
-      setMsg({ tipo: 'error', texto: t('prop.errorFoto', { error: (err as Error).message }) });
+      avisar('error', t('prop.errorFoto', { error: (err as Error).message }));
     } finally {
       setBorrando(null);
     }
@@ -104,7 +115,6 @@ export default function Propiedades() {
     if (enviando || borrando) return; // doble submit duplicaría fotos ('fotos+'); con un borrado en vuelo, dos PATCH tocarían el mismo record
     const el = e.currentTarget;
     const raw = new FormData(el);
-    setMsg(null);
     setEnviando(true);
     try {
       const texto = (k: string) => String(raw.get(k) ?? '').trim();
@@ -138,7 +148,8 @@ export default function Propiedades() {
         if (editando) await actualizarPropiedad(editando.id, payload); // sin fotos → JSON puro
         else await crearPropiedad(payload);
       } else {
-        setMsg({ tipo: 'ok', texto: t('prop.preparandoFotos') });
+        // Progress, gone the moment the outcome arrives (see `finally`).
+        toast({ id: 'prop-fotos', title: t('prop.preparandoFotos') });
         const fotos = await Promise.all(brutas.map(normalizaFoto));
         const fd = new FormData();
         if (editando) {
@@ -157,16 +168,14 @@ export default function Propiedades() {
       }
       el.reset();
       setForm('cerrado');
-      setMsg({
-        tipo: 'ok',
-        texto: editando
-          ? t('prop.actualizada', { titulo: String(payload.titulo) })
-          : t('prop.guardada', { titulo: String(payload.titulo) }),
-      });
+      avisar('ok', editando
+        ? t('prop.actualizada', { titulo: String(payload.titulo) })
+        : t('prop.guardada', { titulo: String(payload.titulo) }));
       recargar();
     } catch (err) {
-      setMsg({ tipo: 'error', texto: t('prop.errorGuardar', { error: (err as Error).message }) });
+      avisar('error', t('prop.errorGuardar', { error: (err as Error).message }));
     } finally {
+      toast.dismiss('prop-fotos');
       setEnviando(false);
     }
   };
@@ -181,8 +190,6 @@ export default function Propiedades() {
           {form === 'cerrado' ? t('prop.nueva') : t('prop.cancelar')}
         </button>
       </div>
-      {msg && <p role="status" className={`aviso aviso-${msg.tipo}`}>{msg.texto}</p>}
-
       {form !== 'cerrado' && (
         <form
           ref={formRef}
@@ -224,14 +231,15 @@ export default function Propiedades() {
                   {editando.fotos.map((nombre, i) => (
                     <li key={nombre}>
                       <img src={fotosUrls(editando)[i]} alt={t('prop.fotoAlt', { n: i + 1, titulo: editando.titulo })} loading="lazy" />
-                      <button
-                        type="button"
-                        className="quitar-foto"
-                        disabled={enviando || borrando !== null}
-                        aria-label={t('prop.eliminarFoto', { n: i + 1 })}
-                        title={t('prop.eliminarFotoTitle')}
-                        onClick={() => borrarFoto(editando, nombre)}
-                      ><IconClose /></button>
+                      <Tooltip label={t('prop.eliminarFotoTitle')}>
+                        <button
+                          type="button"
+                          className="quitar-foto"
+                          disabled={enviando || borrando !== null}
+                          aria-label={t('prop.eliminarFoto', { n: i + 1 })}
+                          onClick={() => borrarFoto(editando, nombre)}
+                        ><IconClose /></button>
+                      </Tooltip>
                     </li>
                   ))}
                 </ul>
@@ -294,6 +302,7 @@ export default function Propiedades() {
           onClose={() => setFichaId(null)}
           title={ficha.titulo}
           subtitle={metaDe(ficha)}
+          error={fichaError}
           footer={(
             <>
               {(ficha.estado === 'borrador' || ficha.estado === 'publicada') && (

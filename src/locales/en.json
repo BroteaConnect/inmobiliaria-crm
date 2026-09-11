@@ -228,7 +228,6 @@
   "nav.propiedades": "Properties",
   "nav.salir": "Log out",
   "nav.web": "View public site ↗",
-  "panel.cerrar": "Close",
   "priority.high": "High",
   "priority.low": "Low",
   "priority.medium": "Medium",
@@ -294,5 +293,7 @@
   "today.titulo": "Today",
   "today.vacio": "Nothing pending. The queue is clear.",
   "today.whatsapp": "WhatsApp",
-  "today.whatsapp.mensaje": "Hello {nombre}, I am writing from the estate agency."
+  "today.whatsapp.mensaje": "Hello {nombre}, I am writing from the estate agency.",
+  "ui.close": "Close",
+  "ui.notifications": "Notifications"
 }

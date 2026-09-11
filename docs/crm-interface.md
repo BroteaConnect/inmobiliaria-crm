@@ -40,8 +40,8 @@ in a rule; everything else is tokens only.
 ```
 
   `--duration-press` with `--ease-out` is for state changes under the pointer
-  (hover, toggle, card border); `--duration-fast` is for the two staged
-  entrances (`kit-panel-in`, `despliegue`) and the hamburger's bars. Never
+  (hover, toggle, card border); `--duration-fast` is for the staged
+  entrances (the ui kit's sheet, `despliegue`) and the hamburger's bars. Never
   `transition: all`, never a literal `.15s`.
 - **Buttons do not add their own press.** `base.css` gives every `button`,
   `[role="button"]`, `.button` and `input[type="submit"]` a token transition
@@ -110,8 +110,8 @@ in CSS: `.lead-alerta` and `.kit-alert::before` are 8px circles in
 
 ```tsx
 import { IconClose } from '../components/kit/Icono';
-<button type="button" className="kit-panel-close" aria-label={t('panel.cerrar')}>
-  <IconClose size={20} />
+<button type="button" className="quitar-foto" aria-label={t('prop.eliminarFoto', { n: i + 1 })}>
+  <IconClose />
 </button>
 ```
 
@@ -126,7 +126,7 @@ desktop header, which is for a pointer, is 40px.
 | Target | How it gets there |
 |---|---|
 | `.kit-btn`, `.primario`, `.alta .acciones button`, `.importar .archivo input`, `.prioridad .nivel`, `.pager button`, `.login .enlace` | `min-height: 2.75rem` |
-| `.kit-panel-close`, `.menu-btn`, `.quitar-foto` | `width: 44px; height: 44px` |
+| `.ui-close` (dialog and sheet), `.menu-btn`, `.quitar-foto` | `width: 44px; height: 44px` |
 | `.etapa-chip`, `.filtros` select and input, `.buscador` | `min-height: 44px` |
 | `.lead .mover button` | 44px wide, 36px drawn, `::after { inset: -4px 0 }` |
 | `.lead-abrir` | about 34px drawn, `::after { inset: -5px 0 }` |
@@ -210,7 +210,56 @@ emergency form, shown only on demand, is a separate form with its own submit.
 The ghost button often already sits on `--surface` (Login, every panel foot),
 where a hover that only sets `background: var(--surface)` is invisible.
 `.kit-btn-ghost:hover` therefore also moves `border-color` to `--muted`, the
-same cue `.kit-panel-close:hover` uses.
+same cue the kit's `.ui-close:hover` uses.
+
+## Interactive primitives come from the ui kit
+
+Since the platform's `ui` brick (`brotea add ui`, 2026-09-11) the dialogs,
+selects, menus, popovers, tabs, tooltips and toasts of this CRM are
+`src/components/ui/` — Radix Primitives behaviour, `ui.css` in theme tokens,
+one anatomy per component. A screen does not hand-roll one of those and does
+not import a component library for it. The brick's `wire.md` (platform repo,
+`feature-templates/ui/`) carries the decision — Radix, not shadcn, because
+shadcn brings Tailwind and CSS the E2 gate counts as debt — and the rules;
+what applies here:
+
+- **A dialog stops the work; the side panel is the work.** Reading a record
+  beside the board is `SidePanel`, which since the ui kit is the kit's `Sheet`
+  under the name the screens already use. It was a native `<dialog>` with
+  `showModal()`; that lives in the browser's top layer, where no portal can
+  paint, and the quick review found the kit's `Select` inside the new-lead
+  panel and the toasts fired with a record open rendered underneath, inert.
+  One layering model for every overlay is the rule now (the brick's `wire.md`).
+  "Answer this before continuing" is the kit's `Dialog`: the email compositor
+  is one. It closes the record while the email is written and reopens it,
+  history reloaded, when it is sent or dropped, so the agent lands on the
+  proof of what happened.
+- **A modal's own failure is said inside the modal.** An open sheet or dialog
+  hides the rest of the page, toasts included, from assistive technology. So
+  the compositor, the new-lead panel and both record panels pass `error` to
+  the kit (`role="alert"` above the footer) from their action's `catch`: a
+  failed send, a failed create, a failed note, a failed publish. The toast
+  stays for the sighted path; the panel is the announced one. The new-lead
+  panel also refuses to close while the create is in flight.
+- **Toasts replace and dismiss by id.** The property search error carries
+  `id: 'prop-search'` (one toast while typing against a failing API, replaced
+  in place); "preparing photos" carries `id: 'prop-fotos'` and is dismissed in
+  the save's `finally`.
+- **`Select` is for the controls that drive a screen** (the board's property
+  filter, the new-lead property). A plain form field that posts stays a native
+  `<select>` (the property form's owner). `Select` carries `''` as a value
+  through a private sentinel; callers keep `''` for "all" / "none".
+- **Outcomes are toasts, states are inline.** "Email sent", "could not save",
+  "photos being prepared" go through `useToast()` (`ok`, `error`, neutral) and
+  leave by themselves. A state the screen is in — loading, empty, a failed load,
+  a module switched off, the local-settings notice — stays inline with
+  `role="status"` / `role="alert"`, because it is true until it is not.
+- **A tooltip names an icon-only control; the control keeps its
+  `aria-label`.** The photo-delete button is the example.
+- `UiProvider` is mounted once in `App.tsx`, inside `LocaleProvider`, so its
+  two strings (`ui.close`, `ui.notifications`) follow the language switch. The
+  kit's layers sit at `z-index: 100`, above the sticky header (50) and the
+  mobile tab bar (60); the toast viewport is above everything.
 
 ## Every list states loading, empty and error
 
@@ -257,11 +306,21 @@ every shot. The PR body of #42 embeds them. The shots predate the last review
 fixes (failed-load state, `role="img"` on the dot, the `.lead-abrir` tap
 target, the ghost hover cue), which were verified by reading the code paths.
 
-## Known open item
+`docs/review/ui-kit/<screen>-<width>-<before|after>.png` (2026-09-11) covers
+the ui kit's arrival: `board` (the property filter as `Select`), `record`,
+`compose` (the compositor as `Dialog`; *before* shows it rendered behind the
+open side panel, which is the bug the dialog fixes) and `select` (after only,
+the open list). *Before* is the deployed `origin/main` at `ad91331`; *after*
+is the vite preview of the branch, logged in as the CRM user, on the demo
+lead. Fourteen files, about 1.1 MB.
 
-The side panel enters with `kit-panel-in` (`translateX(2rem)` and opacity,
-`--duration-fast` `--ease-out`) but closes with no exit animation. An exit
-needs `transition-behavior: allow-discrete` and `@starting-style` on the
-`dialog`, which is kit work outside the E2 screens; nothing becomes
-inaccessible or misleading meanwhile. Rated LOW in the E2 review and
-deferred.
+## Known open item, closed by the kit
+
+The E2 review rated LOW that the side panel entered (`kit-panel-in`) but
+closed with no exit. The ui kit's `Sheet` carries a token exit (`ui-slide`
+reversed on `data-state="closed"`, `--duration-exit`), which runs when the
+caller keeps `open` controlled. Kanban and Propiedades mount their panels
+conditionally (`{ficha && <SidePanel open …>}`), so the panel still cuts on
+close: deliberate, because the surface that replaces it (the board, the
+compositor) arrives in the same commit, and two motions for one action is
+noise. Nothing is open here now.
