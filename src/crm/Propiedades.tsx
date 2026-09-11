@@ -2,36 +2,47 @@ import { useI18n } from '../lib/LocaleContext';
 import { useSettings } from '../lib/SettingsContext';
 import { monedaDe } from '../lib/settings';
 import { SidePanel } from '../components/kit/SidePanel';
-import { useEffect, useRef, useState } from 'react';
+import { EditSheet } from '../components/kit/EditSheet';
+import { useEffect, useState } from 'react';
 import { useList, useRemoteList } from '../lib/useList';
 import { ListStatus, Pager } from '../components/Pager';
 import { IconCamera, IconClose } from '../components/kit/Icono';
-import { Tooltip, useToast } from '../components/ui';
+import { Popover, Select, Tooltip, useToast } from '../components/ui';
+import { OwnerDialog } from './OwnerDialog';
+import { EMPTY_FIELDS, canSave, fieldsOf, payloadOf, type PropertyFields } from './property-form';
 import {
-  type Propiedad, type Propietario, loadPropiedades, loadPropietarios, buscarPropiedades,
+  ESTADOS_PROPIEDAD, type EstadoPropiedad, type Propiedad, type Propietario,
+  loadPropiedades, loadPropietarios, buscarPropiedades,
   crearPropiedad, actualizarPropiedad, fotoUrl, fotosUrls, quitarFoto, normalizaFoto, fmtPrecio,
 } from './api';
+
+// One panel, three modes. A property is read where it is read, edited where it
+// is read, and created in the same shape — which is what the lead board has
+// always done and this screen did not: editing used to close the record and
+// unfold a form over the grid, so the agent lost the thing they were editing
+// and had to find it again on the way back.
+type Panel = { modo: 'ficha' | 'editar'; id: string } | { modo: 'nueva' } | null;
+
+/** The owner picker's "add one now" row. Never a value that reaches the record. */
+const NUEVO_PROPIETARIO = '__nuevo__';
 
 export default function Propiedades() {
   const { locale, t } = useI18n();
   const moneda = monedaDe(useSettings().settings);
   const [owners, setOwners] = useState<Propietario[]>([]);
-  const [form, setForm] = useState<'cerrado' | 'nueva' | Propiedad>('cerrado');
+  const [panel, setPanel] = useState<Panel>(null);
+  const [campos, setCampos] = useState<PropertyFields>(EMPTY_FIELDS);
   const [enviando, setEnviando] = useState(false);
   const [borrando, setBorrando] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [nuevoPropietario, setNuevoPropietario] = useState(false);
   // Outcomes go to a toast: announced, gone by themselves, never a bar that
   // pushes the grid down and stays until somebody notices it is stale.
   const toast = useToast();
   const avisar = (tipo: 'ok' | 'error', texto: string) => toast({ title: texto, tone: tipo });
-  const formRef = useRef<HTMLFormElement>(null);
-  // The property being looked at, as an id: the record itself is read back from
-  // the list on every render, so publishing or editing it updates the panel
-  // without a second copy that can disagree.
-  const [fichaId, setFichaId] = useState<string | null>(null);
-  // A failed publish is said inside the open panel too: the panel hides the
-  // toast from assistive technology. Cleared when another record opens.
-  const [fichaError, setFichaError] = useState<string | null>(null);
-  useEffect(() => { setFichaError(null); }, [fichaId]);
+  // A failure of the panel's own action is ALSO said inside the panel: an open
+  // sheet hides the toasts from assistive technology.
+  const [panelError, setPanelError] = useState<string | null>(null);
 
   // Buscar y paginar salen del brick `list`: la guarda de respuestas
   // desordenadas, el rebote del teclado y el recorte de la página vivían aquí
@@ -44,16 +55,24 @@ export default function Propiedades() {
   const busqueda = remoto.query;
   const setBusqueda = remoto.setQuery;
   const props = remoto.items;
-  const ficha = fichaId ? (props.find((p) => p.id === fichaId) ?? null) : null;
   const pagina = useList(props, { fields: ['titulo', 'municipio', 'direccion'], size: 12 });
 
-  const editando = typeof form === 'object' ? form : null;
+  // The record a mutation just returned. The list is the source of truth, but
+  // it reloads asynchronously: without this the panel would blink shut after
+  // creating a property, and a photo just uploaded would take a round trip to
+  // appear. It is dropped when the panel closes, so it can never go stale.
+  const [fresco, setFresco] = useState<Propiedad | null>(null);
+  const abiertoId = panel && 'id' in panel ? panel.id : null;
+  const ficha = abiertoId
+    ? (fresco?.id === abiertoId ? fresco : props.find((p) => p.id === abiertoId) ?? null)
+    : null;
+
   // The one-line summary of a property. Only what is known: a missing count
   // is left out rather than shown as a dash pretending to be a number.
   const metaDe = (p: Propiedad) => [
     p.municipio,
-    p.habitaciones != null && t('prop.meta.rooms', { n: p.habitaciones }),
-    p.superficie != null && t('prop.meta.area', { n: p.superficie }),
+    p.habitaciones != null && p.habitaciones > 0 && t('prop.meta.rooms', { n: p.habitaciones }),
+    p.superficie != null && p.superficie > 0 && t('prop.meta.area', { n: p.superficie }),
   ].filter(Boolean).join(' · ');
 
   const recargar = () => {
@@ -62,123 +81,177 @@ export default function Propiedades() {
   };
   useEffect(() => { loadPropietarios().then(setOwners); }, []);
 
-  // Un fallo de la búsqueda se cuenta igual que antes: en la misma línea de
-  // aviso que el resto de la pantalla, no en un hueco propio.
   useEffect(() => {
     // One toast, replaced in place: a search that fails on every keystroke is
     // one error, not a stack of them.
     if (remoto.error) toast({ id: 'prop-search', tone: 'error', title: t('prop.errorBuscar', { error: remoto.error.message }) });
   }, [remoto.error, t, toast]);
 
-  // Al abrir en modo edición, lleva el formulario a la vista (la card
-  // pulsada puede estar muy abajo en la rejilla).
-  useEffect(() => {
-    if (typeof form === 'object') {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [form]);
+  const cerrarPanel = () => { setPanel(null); setPanelError(null); setFresco(null); };
+  // Opening seeds `fresco` with the record that was clicked, so the panel never
+  // depends on the list staying still underneath it: a search answer landing
+  // while a record is open used to be able to drop that row and close the
+  // panel with no explanation.
+  const verFicha = (p: Propiedad) => { setFresco(p); setPanel({ modo: 'ficha', id: p.id }); setPanelError(null); };
+  const editar = (p: Propiedad) => {
+    setCampos(fieldsOf(p));
+    setPanelError(null);
+    setPanel({ modo: 'editar', id: p.id });
+  };
+  const nueva = () => {
+    setCampos(EMPTY_FIELDS);
+    setPanelError(null);
+    setFresco(null);
+    setPanel({ modo: 'nueva' });
+  };
+  const set = <K extends keyof PropertyFields>(k: K) => (v: string) =>
+    setCampos((c) => ({ ...c, [k]: v }));
 
-  const publicar = async (p: Propiedad) => {
+  // -- the record's own decisions, taken while reading it ----------------------
+
+  // One write at a time on the open record. Without it, pressing a status
+  // button on a slow link looks like nothing happened, the agent presses
+  // again, and two PATCHes race: whichever answers last wins the panel, which
+  // can be the older one. The photo handlers already worked this way.
+  const [escribiendo, setEscribiendo] = useState(false);
+  const ocupado = escribiendo || subiendo || borrando !== null;
+
+  const cambiarEstado = async (p: Propiedad, estado: EstadoPropiedad) => {
+    if (p.estado === estado || ocupado) return;
+    setEscribiendo(true);
     try {
-      await actualizarPropiedad(p.id, { estado: p.estado === 'publicada' ? 'borrador' : 'publicada' });
+      setFresco(await actualizarPropiedad(p.id, { estado }));
+      setPanelError(null);
       recargar();
+      avisar('ok', t('prop.estadoCambiado', { estado: t(`estadoProp.${estado}`) }));
     } catch (err) {
       const msg = t('prop.errorEstado', { error: (err as Error).message });
-      setFichaError(msg);
+      setPanelError(msg);
       avisar('error', msg);
+    } finally {
+      setEscribiendo(false);
+    }
+  };
+
+  const [precioAbierto, setPrecioAbierto] = useState(false);
+  const [precioValor, setPrecioValor] = useState('');
+  const abrirPrecio = (p: Propiedad) => {
+    setPrecioValor(fieldsOf(p).precio);
+    setPrecioAbierto(true);
+  };
+  const guardarPrecio = async (p: Propiedad) => {
+    if (ocupado) return;
+    const raw = precioValor.trim();
+    const n = Number(raw);
+    setEscribiendo(true);
+    try {
+      setFresco(await actualizarPropiedad(p.id, { precio: raw === '' || Number.isNaN(n) ? null : n }));
+      setPrecioAbierto(false);
+      setPanelError(null);
+      recargar();
+    } catch (err) {
+      const msg = t('prop.errorGuardar', { error: (err as Error).message });
+      setPanelError(msg);
+      avisar('error', msg);
+    } finally {
+      setEscribiendo(false);
+    }
+  };
+
+  // Photos belong to the record, not to the form: they are added and removed
+  // while looking at the property, which is also why saving is plain JSON now
+  // and the multipart-with-fields path is gone.
+  const subirFotos = async (p: Propiedad, elegidas: File[]) => {
+    if (!elegidas.length || ocupado) return;
+    setSubiendo(true);
+    // Progress, gone the moment the outcome arrives (see `finally`).
+    toast({ id: 'prop-fotos', title: t('prop.preparandoFotos') });
+    try {
+      const fotos = await Promise.all(elegidas.map((f) => normalizaFoto(f, locale)));
+      const fd = new FormData();
+      // 'fotos+' APPENDS (PocketBase syntax); a plain 'fotos' in a PATCH would
+      // replace the whole set and delete the files already there.
+      for (const f of fotos) fd.append('fotos+', f, f.name);
+      setFresco(await actualizarPropiedad(p.id, fd));
+      setPanelError(null);
+      recargar();
+      avisar('ok', t('prop.fotosSubidas', { count: fotos.length }));
+    } catch (err) {
+      const msg = t('prop.errorSubirFotos', { error: (err as Error).message });
+      setPanelError(msg);
+      avisar('error', msg);
+    } finally {
+      toast.dismiss('prop-fotos');
+      setSubiendo(false);
     }
   };
 
   // Borrar una foto es un PATCH inmediato ('fotos-') e irreversible: PocketBase
-  // elimina el fichero del disco, de ahí el confirm. El form sigue abierto y la
-  // tira se refresca con el record que devuelve el PATCH (misma key → los
-  // campos a medio editar no se pierden).
+  // elimina el fichero del disco, de ahí el confirm.
   const borrarFoto = async (p: Propiedad, nombre: string) => {
-    if (borrando) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
+    if (ocupado) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
     if (!confirm(t('prop.confirmarFoto'))) return;
     setBorrando(nombre);
     try {
-      const actualizada = await quitarFoto(p.id, nombre);
-      // Solo si esa propiedad sigue abierta: si mientras llegaba la respuesta
-      // se cerró el form o se abrió otra, no hay que reabrirlo ni pisarla.
-      setForm((f) => (typeof f === 'object' && f.id === actualizada.id ? actualizada : f));
+      setFresco(await quitarFoto(p.id, nombre));
+      setPanelError(null);
       recargar();
     } catch (err) {
-      avisar('error', t('prop.errorFoto', { error: (err as Error).message }));
+      const msg = t('prop.errorFoto', { error: (err as Error).message });
+      setPanelError(msg);
+      avisar('error', msg);
     } finally {
       setBorrando(null);
     }
   };
 
-  const guardar = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (enviando || borrando) return; // doble submit duplicaría fotos ('fotos+'); con un borrado en vuelo, dos PATCH tocarían el mismo record
-    const el = e.currentTarget;
-    const raw = new FormData(el);
-    setEnviando(true);
-    try {
-      const texto = (k: string) => String(raw.get(k) ?? '').trim();
-      const payload: Record<string, unknown> = { titulo: texto('titulo') };
-      if (editando) {
-        // PATCH: hay que enviar también los campos vacíos ('' limpia texto,
-        // null limpia numéricos); si se omiten, un valor borrado en el form
-        // persistiría silenciosamente en el backend. No se toca `estado`.
-        for (const k of ['municipio', 'direccion', 'descripcion', 'propietario'] as const) {
-          payload[k] = texto(k);
-        }
-        for (const k of ['precio', 'habitaciones', 'banos', 'superficie'] as const) {
-          const v = Number(texto(k));
-          payload[k] = texto(k) === '' || Number.isNaN(v) ? null : v;
-        }
-      } else {
-        // Alta: payload explícito, solo campos con valor (un multipart con
-        // partes vacías es justo lo que hacía tropezar al backend).
-        payload.estado = 'borrador';
-        for (const k of ['municipio', 'direccion', 'descripcion', 'propietario'] as const) {
-          if (texto(k)) payload[k] = texto(k);
-        }
-        for (const k of ['precio', 'habitaciones', 'banos', 'superficie'] as const) {
-          const v = texto(k) === '' ? undefined : Number(texto(k));
-          if (v !== undefined && !Number.isNaN(v)) payload[k] = v;
-        }
-      }
+  // -- the form ----------------------------------------------------------------
 
-      const brutas = (raw.getAll('fotos') as File[]).filter((f) => f && f.size > 0);
-      if (brutas.length === 0) {
-        if (editando) await actualizarPropiedad(editando.id, payload); // sin fotos → JSON puro
-        else await crearPropiedad(payload);
-      } else {
-        // Progress, gone the moment the outcome arrives (see `finally`).
-        toast({ id: 'prop-fotos', title: t('prop.preparandoFotos') });
-        const fotos = await Promise.all(brutas.map(normalizaFoto));
-        const fd = new FormData();
-        if (editando) {
-          // PATCH multipart: los campos van en '@jsonPayload' (PocketBase lo
-          // fusiona como JSON) para conservar los null que limpian numéricos —
-          // como parte multipart vacía tropezarían con el backend.
-          fd.append('@jsonPayload', JSON.stringify(payload));
-        } else {
-          for (const [k, v] of Object.entries(payload)) fd.append(k, String(v));
-        }
-        // En edición las fotos nuevas se AÑADEN ('fotos+', sintaxis de
-        // PocketBase); 'fotos' a secas en un PATCH reemplazaría el set entero.
-        for (const f of fotos) fd.append(editando ? 'fotos+' : 'fotos', f, f.name);
-        if (editando) await actualizarPropiedad(editando.id, fd);
-        else await crearPropiedad(fd);
-      }
-      el.reset();
-      setForm('cerrado');
+  const guardar = async () => {
+    if (enviando || !panel || panel.modo === 'ficha') return;
+    const editando = panel.modo === 'editar' ? ficha : null;
+    if (panel.modo === 'editar' && !editando) {
+      // The record went away under the form. Saying nothing would leave the
+      // agent pressing an enabled button at a silent app.
+      avisar('error', t('prop.errorDesaparecida'));
+      cerrarPanel();
+      return;
+    }
+    setEnviando(true);
+    setPanelError(null);
+    const payload = payloadOf(campos, !!editando);
+    try {
+      const guardada = editando
+        ? await actualizarPropiedad(editando.id, payload)
+        : await crearPropiedad(payload);
+      setFresco(guardada);
+      // Back to the record, never to the grid: the next thing an agent does
+      // with a property they just described is add its photos.
+      setPanel({ modo: 'ficha', id: guardada.id });
+      recargar();
       avisar('ok', editando
         ? t('prop.actualizada', { titulo: String(payload.titulo) })
         : t('prop.guardada', { titulo: String(payload.titulo) }));
-      recargar();
     } catch (err) {
-      avisar('error', t('prop.errorGuardar', { error: (err as Error).message }));
+      const msg = t('prop.errorGuardar', { error: (err as Error).message });
+      setPanelError(msg);
+      avisar('error', msg);
     } finally {
-      toast.dismiss('prop-fotos');
       setEnviando(false);
     }
   };
+
+  // "Add one" goes ABOVE the owners, not after them: this agency has two
+  // hundred, so at the bottom of the list it is a row nobody ever scrolls to.
+  const opcionesPropietario = [
+    { value: '', label: t('prop.sinPropietario') },
+    { value: NUEVO_PROPIETARIO, label: t('propietario.nuevo') },
+    ...owners.map((o) => ({ value: o.id, label: o.nombre })),
+  ];
+  const nombrePropietario = (id: string) => owners.find((o) => o.id === id)?.nombre ?? '';
+
+  const editando = panel?.modo === 'editar';
+  const enFormulario = panel?.modo === 'editar' || panel?.modo === 'nueva';
 
   return (
     <div>
@@ -186,77 +259,8 @@ export default function Propiedades() {
         <h1>{t('prop.titulo')}</h1>
         <input type="search" className="buscador" placeholder={t('prop.buscar')}
           value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label={t('prop.buscarAria')} />
-        <button className="primario" onClick={() => setForm(form === 'cerrado' ? 'nueva' : 'cerrado')}>
-          {form === 'cerrado' ? t('prop.nueva') : t('prop.cancelar')}
-        </button>
+        <button className="primario" onClick={nueva}>{t('prop.nueva')}</button>
       </div>
-      {form !== 'cerrado' && (
-        <form
-          ref={formRef}
-          // owners.length en la key: si se abre en edición antes de que
-          // carguen los propietarios, el select remonta con su defaultValue
-          // ya resoluble (si no, quedaría en "—" y al guardar desvincularía).
-          key={`${editando ? editando.id : 'nueva'}-${owners.length}`}
-          className="alta"
-          onSubmit={guardar}
-        >
-          <h2>{editando ? t('prop.editarTitulo', { titulo: editando.titulo }) : t('prop.nuevaTitulo')}</h2>
-          <div className="fila2">
-            <label>{t('prop.campo.titulo')} <input name="titulo" required defaultValue={editando?.titulo ?? ''} /></label>
-            <label>{t('prop.campo.municipio')} <input name="municipio" defaultValue={editando?.municipio ?? ''} /></label>
-            <label>{t('prop.campo.direccion')} <input name="direccion" defaultValue={editando?.direccion ?? ''} /></label>
-          </div>
-          <div className="fila">
-            <label>{t('prop.campo.precio')} <input name="precio" type="number" min="0" defaultValue={editando?.precio ?? ''} /></label>
-            <label>{t('prop.campo.habitaciones')} <input name="habitaciones" type="number" min="0" defaultValue={editando?.habitaciones ?? ''} /></label>
-            <label>{t('prop.campo.banos')} <input name="banos" type="number" min="0" defaultValue={editando?.banos ?? ''} /></label>
-            <label>{t('prop.campo.superficie')} <input name="superficie" type="number" min="0" defaultValue={editando?.superficie ?? ''} /></label>
-          </div>
-          <label>{t('prop.campo.descripcion')} <textarea name="descripcion" rows={3} defaultValue={editando?.descripcion ?? ''} /></label>
-          <label>{t('prop.campo.propietario')}
-            <select name="propietario" defaultValue={editando?.propietario ?? ''}>
-              <option value="">{t('prop.sinPropietario')}</option>
-              {owners.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-            </select>
-          </label>
-          {editando && (
-            <div className="fotos-actuales">
-              <span className="pista">
-                {editando.fotos?.length
-                  ? t('prop.fotos', { count: editando.fotos.length })
-                  : t('prop.sinFotos')}
-              </span>
-              {(editando.fotos?.length ?? 0) > 0 && (
-                <ul className="tira-fotos">
-                  {editando.fotos.map((nombre, i) => (
-                    <li key={nombre}>
-                      <img src={fotosUrls(editando)[i]} alt={t('prop.fotoAlt', { n: i + 1, titulo: editando.titulo })} loading="lazy" />
-                      <Tooltip label={t('prop.eliminarFotoTitle')}>
-                        <button
-                          type="button"
-                          className="quitar-foto"
-                          disabled={enviando || borrando !== null}
-                          aria-label={t('prop.eliminarFoto', { n: i + 1 })}
-                          onClick={() => borrarFoto(editando, nombre)}
-                        ><IconClose /></button>
-                      </Tooltip>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          <label>{t('prop.campo.fotos')} <input name="fotos" type="file" accept="image/*" multiple />
-            {editando && <span className="pista">{t('prop.fotosNuevas')}</span>}
-          </label>
-          <div className="acciones">
-            <button className="primario" type="submit" disabled={enviando || borrando !== null}>
-              {enviando ? t('prop.guardando') : t('prop.guardar')}
-            </button>
-            <button type="button" disabled={enviando} onClick={() => setForm('cerrado')}>{t('prop.cancelar')}</button>
-          </div>
-        </form>
-      )}
 
       {/* Loading and empty come from the list brick; "no results" keeps its own
           words because it names the search. */}
@@ -282,7 +286,7 @@ export default function Propiedades() {
             {/* One way in, like every other list in this CRM. Publishing and
                 editing are decisions about a property, and you take them
                 looking at the property — not from a grid tile. */}
-            <button className="cuerpo" onClick={() => setFichaId(p.id)}>
+            <button className="cuerpo" onClick={() => verFicha(p)}>
               <strong>{p.titulo}</strong>
               <span className="meta">{metaDe(p)}</span>
               <span className="precio">{fmtPrecio(locale, p.precio, moneda)}</span>
@@ -296,40 +300,188 @@ export default function Propiedades() {
           marcha es un scroll infinito en el que nadie encuentra nada. */}
       <Pager page={pagina} onPage={pagina.setPage} />
 
-      {ficha && (
+      {/* The record. Price, status and photos are edited here, in place: they
+          are single decisions, and a form is a bad way to ask for one. */}
+      {ficha && panel?.modo === 'ficha' && (
         <SidePanel
           open
-          onClose={() => setFichaId(null)}
+          onClose={cerrarPanel}
           title={ficha.titulo}
           subtitle={metaDe(ficha)}
-          error={fichaError}
+          error={panelError}
           footer={(
-            <>
-              {(ficha.estado === 'borrador' || ficha.estado === 'publicada') && (
-                <button className="kit-btn kit-btn-ghost" onClick={() => publicar(ficha)}>
-                  {ficha.estado === 'publicada' ? t('prop.retirar') : t('prop.publicar')}
-                </button>
-              )}
-              <button className="kit-btn kit-btn-primary" onClick={() => { setForm(ficha); setFichaId(null); }}>
-                {t('prop.editar')}
-              </button>
-            </>
+            <button className="kit-btn kit-btn-primary" onClick={() => editar(ficha)}>
+              {t('prop.editar')}
+            </button>
           )}
         >
-          <p className="ficha-precio">{fmtPrecio(locale, ficha.precio, moneda)}</p>
-          <p className={`estado estado-${ficha.estado}`}>{t(`estadoProp.${ficha.estado}`)}</p>
+          <Popover
+            open={precioAbierto}
+            onOpenChange={(o) => (o ? abrirPrecio(ficha) : setPrecioAbierto(false))}
+            title={t('prop.campo.precio')}
+            trigger={(
+              // With no price the headline number would be a lonely dash: it
+              // says the right thing on a card, in a column of cards, and
+              // nothing at all where it is also the way to set one.
+              <button
+                type="button"
+                className={ficha.precio ? 'ficha-precio' : 'ficha-precio vacio'}
+                // `aria-label` REPLACES the content for assistive technology,
+                // so a bare "edit the price" made the price itself unreadable
+                // — it appears nowhere else in the panel — and left the empty
+                // state saying one thing and announcing another.
+                aria-label={t('prop.precioEditarValor', {
+                  precio: ficha.precio ? fmtPrecio(locale, ficha.precio, moneda) : t('prop.sinPrecio'),
+                })}
+              >
+                {ficha.precio ? fmtPrecio(locale, ficha.precio, moneda) : t('prop.sinPrecio')}
+              </button>
+            )}
+          >
+            <form
+              className="precio-form"
+              onSubmit={(e) => { e.preventDefault(); guardarPrecio(ficha); }}
+            >
+              <input
+                type="number" min="0" autoFocus value={precioValor}
+                aria-label={t('prop.campo.precio')}
+                onChange={(e) => setPrecioValor(e.target.value)}
+              />
+              <button type="submit" className="kit-btn kit-btn-primary">{t('prop.guardar')}</button>
+            </form>
+          </Popover>
+
+          <h3>{t('prop.estadoTitulo')}</h3>
+          {/* The status IS the publish action, and there are four of them: a
+              two-way toggle could not say "reserved" without opening the form. */}
+          <div className="estados" role="group" aria-label={t('prop.estadoAria')}>
+            {ESTADOS_PROPIEDAD.map((e) => (
+              <button
+                key={e}
+                type="button"
+                className={`estado-btn estado-${e}${ficha.estado === e ? ' activa' : ''}`}
+                aria-pressed={ficha.estado === e}
+                disabled={ocupado}
+                onClick={() => cambiarEstado(ficha, e)}
+              >
+                {t(`estadoProp.${e}`)}
+              </button>
+            ))}
+          </div>
+
           {ficha.direccion && <p className="ficha-dir">{ficha.direccion}</p>}
           {ficha.descripcion && <p className="ficha-desc">{ficha.descripcion}</p>}
+          {nombrePropietario(ficha.propietario) && (
+            <p className="ficha-dueno">
+              <span>{t('prop.campo.propietario')}</span> {nombrePropietario(ficha.propietario)}
+            </p>
+          )}
 
           <h3>{t('prop.campo.fotos')}</h3>
           {fotosUrls(ficha).length === 0 && <p className="vacio">{t('prop.sinFotos')}</p>}
-          <div className="ficha-fotos">
-            {fotosUrls(ficha).map((src) => (
-              <img key={src} src={src} alt="" loading="lazy" />
-            ))}
-          </div>
+          {fotosUrls(ficha).length > 0 && (
+            <ul className="ficha-fotos">
+              {ficha.fotos.map((nombre, i) => (
+                <li key={nombre}>
+                  <img src={fotosUrls(ficha)[i]} alt={t('prop.fotoAlt', { n: i + 1, titulo: ficha.titulo })} loading="lazy" />
+                  <Tooltip label={t('prop.eliminarFotoTitle')}>
+                    <button
+                      type="button"
+                      className="quitar-foto"
+                      disabled={ocupado}
+                      aria-label={t('prop.eliminarFoto', { n: i + 1 })}
+                      onClick={() => borrarFoto(ficha, nombre)}
+                    ><IconClose /></button>
+                  </Tooltip>
+                </li>
+              ))}
+            </ul>
+          )}
+          <label className="campo">{subiendo ? t('prop.fotosSubiendo') : t('prop.fotosAnadir')}
+            <input
+              type="file" accept="image/*" multiple disabled={ocupado}
+              onChange={(e) => {
+                const elegidas = Array.from(e.target.files ?? []);
+                e.target.value = ''; // so the same file can be picked again after a failure
+                subirFotos(ficha, elegidas);
+              }}
+            />
+          </label>
         </SidePanel>
       )}
+
+      {/* The form, in the same place the record was, with the same anatomy as
+          the new-lead panel: fields in one column, one primary, one ghost. */}
+      {enFormulario && (
+        <EditSheet
+          open
+          onClose={() => (editando && ficha ? verFicha(ficha) : cerrarPanel())}
+          onSubmit={guardar}
+          title={editando && ficha ? t('prop.editarTitulo', { titulo: ficha.titulo }) : t('prop.nuevaTitulo')}
+          subtitle={editando ? undefined : t('prop.nuevaAyuda')}
+          error={panelError}
+          busy={enviando}
+          canSave={canSave(campos)}
+          saveLabel={t('prop.guardar')}
+          busyLabel={t('prop.guardando')}
+          cancelLabel={t('prop.cancelar')}
+        >
+          <label className="campo">{t('prop.campo.titulo')}
+            <input value={campos.titulo} required autoFocus onChange={(e) => set('titulo')(e.target.value)} />
+          </label>
+          <div className="campos-2">
+            <label className="campo">{t('prop.campo.municipio')}
+              <input value={campos.municipio} onChange={(e) => set('municipio')(e.target.value)} />
+            </label>
+            <label className="campo">{t('prop.campo.direccion')}
+              <input value={campos.direccion} onChange={(e) => set('direccion')(e.target.value)} />
+            </label>
+          </div>
+          <div className="campos-2">
+            <label className="campo">{t('prop.campo.precio')}
+              <input type="number" min="0" value={campos.precio} onChange={(e) => set('precio')(e.target.value)} />
+            </label>
+            <label className="campo">{t('prop.campo.superficie')}
+              <input type="number" min="0" value={campos.superficie} onChange={(e) => set('superficie')(e.target.value)} />
+            </label>
+            <label className="campo">{t('prop.campo.habitaciones')}
+              <input type="number" min="0" value={campos.habitaciones} onChange={(e) => set('habitaciones')(e.target.value)} />
+            </label>
+            <label className="campo">{t('prop.campo.banos')}
+              <input type="number" min="0" value={campos.banos} onChange={(e) => set('banos')(e.target.value)} />
+            </label>
+          </div>
+          <label className="campo">{t('prop.campo.descripcion')}
+            <textarea rows={4} value={campos.descripcion} onChange={(e) => set('descripcion')(e.target.value)} />
+          </label>
+          <div className="campo">
+            <span>{t('prop.campo.propietario')}</span>
+            <Select
+              value={campos.propietario}
+              ariaLabel={t('prop.campo.propietario')}
+              options={opcionesPropietario}
+              onValueChange={(v) => {
+                if (v === NUEVO_PROPIETARIO) setNuevoPropietario(true);
+                else set('propietario')(v);
+              }}
+            />
+          </div>
+          {/* Photos are not here: they belong to the record and are added from
+              it, so a new property is one short form and nothing else. */}
+          <p className="pista">{editando ? t('prop.fotosEnFicha') : t('prop.fotosDespues')}</p>
+        </EditSheet>
+      )}
+
+      <OwnerDialog
+        open={nuevoPropietario}
+        onClose={() => setNuevoPropietario(false)}
+        onCreated={(creado) => {
+          setOwners((prev) => [...prev, creado].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+          set('propietario')(creado.id);
+          setNuevoPropietario(false);
+          avisar('ok', t('propietario.creado', { nombre: creado.nombre }));
+        }}
+      />
     </div>
   );
 }

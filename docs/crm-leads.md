@@ -201,7 +201,8 @@ curl -X POST "$PB/api/collections/actividades/records" \
 
 ## Manual lead (`+ New`)
 
-The `+ New` button opens a second `SidePanel` with name, phone, email,
+The `+ New` button opens an `EditSheet` (`src/components/kit/EditSheet.tsx`,
+the anatomy every form in this CRM shares since 2026-09-11) with name, phone, email,
 property (the ui kit's `Select`, preselected from the active property filter;
 `''` is `filtros.sinPropiedad`) and message. Create is enabled once a name
 and a phone or email are present; it calls
@@ -209,9 +210,11 @@ and a phone or email are present; it calls
 record with an empty history, then loads it. `origen: 'manual'` keeps phone
 and walk-in leads out of the "web" count in reports.
 
+- Enter in any field creates the lead: the fields are a real `<form>` and the
+  footer's primary reaches it through `form="<id>"`.
 - While the create is in flight (`guardando`) the panel refuses to close:
   Escape and the overlay are ignored, so a panel cannot vanish mid-save and
-  invite a second entry.
+  invite a second entry. `EditSheet` enforces that for every form.
 - A failed create (`lead.nuevoError`) is said inside the panel (`error`,
   `role="alert"`) and as an error toast; the form keeps what was typed.
 

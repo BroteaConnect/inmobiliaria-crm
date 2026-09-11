@@ -23,6 +23,10 @@
 
 .kit-toggle {
   display: flex;
+  /* Stated, not inherited: the CRM styles every `label` as a column (field
+     above its input) and a toggle is a label too, so without this the switch
+     sat on its own line above the thing it switches. */
+  flex-direction: row;
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) 0;

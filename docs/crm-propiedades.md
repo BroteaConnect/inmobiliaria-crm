@@ -10,23 +10,39 @@ shared PocketBase. Scope: this repo only — the public catalog that consumes
 
 | Action | Trigger | Backend call | Resulting estado |
 |---|---|---|---|
-| Create | `+ Nueva propiedad` → form → Guardar | `crearPropiedad` (POST) | always `borrador` |
-| Publish / unpublish | ghost button in the side panel footer (shown only for `borrador`/`publicada`) | `actualizarPropiedad(id, { estado })` | `publicada` ↔ `borrador` |
-| Edit | primary `Edit` button in the side panel footer (any estado) | `actualizarPropiedad(id, payload)` (PATCH) | unchanged: edit never sends `estado` |
-| Delete photo | `IconClose` button (`.quitar-foto`, named by a ui kit `Tooltip`) on a thumbnail in the edit form (confirm-gated) | `quitarFoto(id, filename)` (PATCH `fotos-`) | unchanged |
+| Create | `+ Nueva propiedad` in the bar → the form in the panel → Guardar | `crearPropiedad` (POST, JSON) | always `borrador` |
+| Change status | one of the four buttons of the status group, in the record | `actualizarPropiedad(id, { estado })` | the one that was pressed |
+| Edit | primary `Editar` in the record's footer (any estado) | `actualizarPropiedad(id, payload)` (PATCH, JSON) | unchanged: a save never sends `estado` |
+| Change the price | the price itself, in the record, through a kit `Popover` | `actualizarPropiedad(id, { precio })` | unchanged |
+| Add photos | the file input in the record | `actualizarPropiedad(id, FormData)` (PATCH `fotos+`) | unchanged |
+| Delete a photo | `IconClose` (`.quitar-foto`, named by a ui kit `Tooltip`) on a thumbnail in the record, confirm-gated | `quitarFoto(id, filename)` (PATCH `fotos-`) | unchanged |
+| Add an owner | `+ Nuevo propietario…` in the owner picker of the form | `crearPropietario` (POST) | unchanged |
 
 A card has one way in: its body (`.ficha .cuerpo`) is a button that opens the
 property in the kit `SidePanel` (the ui kit's `Sheet` since 2026-09-11, see
-[docs/crm-interface.md](crm-interface.md)); publishing and editing are decided
-there, looking at the record, not from a grid tile. A failed publish
-(`prop.errorEstado`) is said inside the open panel (the `error` prop,
-`role="alert"` above the footer) and as an error toast; the inline message is
-cleared when another record opens.
+[docs/crm-interface.md](crm-interface.md)). Everything above happens in that
+one panel, which since 2026-09-11 has three modes — `ficha`, `editar`,
+`nueva` — held in a single `Panel` state:
+
+```ts
+type Panel = { modo: 'ficha' | 'editar'; id: string } | { modo: 'nueva' } | null;
+```
+
+Editing no longer closes the record and unfolds a form over the grid: the
+fields replace the record's contents in place and saving comes straight back
+to it. That is the same shape as the lead board's new-lead panel, and the
+component both screens now share is `src/components/kit/EditSheet.tsx`.
+
+A failure of any of those actions is said **inside** the panel (the `error`
+prop, `role="alert"` above the footer) **and** as an error toast: an open
+sheet hides the toast viewport from assistive technology, so the toast alone
+is feedback a screen-reader user never gets. `panelError` is cleared when the
+panel closes, when another record opens and when the failing action is retried.
 
 Outcomes on this page are toasts from the ui kit's `useToast()`, never a
-banner that pushes the grid down: `prop.guardada` / `prop.actualizada` (`ok`),
-`prop.errorGuardar`, `prop.errorFoto`, `prop.errorEstado` and
-`prop.errorBuscar` (`error`).
+banner that pushes the grid down: `prop.guardada` / `prop.actualizada` /
+`prop.fotosSubidas` (`ok`), `prop.errorGuardar`, `prop.errorFoto`,
+`prop.errorSubirFotos`, `prop.errorEstado` and `prop.errorBuscar` (`error`).
 
 Publishing is instant on the public site (it reads client-side with the
 `estado="publicada"` filter; no rebuild).
@@ -129,51 +145,83 @@ const metaDe = (p: Propiedad) => [
 en-dash placeholders for unknown values is gone. `.ficha .meta` and
 `.ficha .precio` use tabular numerals.
 
-## Edit flow
+## The panel's three modes
 
-Every card has an `Editar` button that reopens the alta form prefilled with
-that record. Mechanics:
+### Reading a record
 
-- One form serves both modes, driven by
-  `useState<'cerrado' | 'nueva' | Propiedad>` — an object value means
-  edit mode.
-- Inputs are **uncontrolled** (`defaultValue`); fresh values per record are
-  guaranteed by a **key remount**:
-  `key={`${editando ? editando.id : 'nueva'}-${owners.length}`}`.
-  `owners.length` is part of the key on purpose: if editing starts before
-  the propietarios list has loaded, the select remounts once owners arrive
-  so its `defaultValue` resolves (otherwise it would show the empty option
-  and saving would unlink the owner). The empty option reads
-  `prop.sinPropietario` ("No owner" / "Sin propietario"), not a dash. The
-  owner field stays a native `<select>`: it is a plain form field that posts,
-  not a control that drives the screen, so the ui kit's `Select` is not used
-  here (the rule is in [docs/crm-interface.md](crm-interface.md)).
-- Opening edit mode scrolls the form into view (the clicked card may be far
-  down the grid).
-- Submit is double-click-guarded (`enviando` state disables both buttons and
-  bails out early) — a double submit in edit mode would duplicate photos via
-  `fotos+`. The guard also bails while a photo deletion is in flight
-  (`borrando`): two concurrent PATCHes on the same record could land out of
-  order.
-- The outcome is a toast: `prop.guardada` or `prop.actualizada` (`ok`) on
-  success, `prop.errorGuardar` (`error`) on failure. When photos are attached,
-  a neutral "preparing photos" toast (`prop.preparandoFotos`, `id:
-  'prop-fotos'`) shows while `normalizaFoto` runs and is dismissed in the
-  submit's `finally` (`toast.dismiss('prop-fotos')`), so it is gone the moment
-  the outcome arrives, on success and on failure alike.
+The record shows what is known and lets three decisions be taken without a
+form, because each of them is a single value:
+
+- **The price is a button.** Pressing it opens a kit `Popover` with a number
+  input and `Guardar`; Enter saves, Escape closes. A blur does not save:
+  clicking "Cancel" and having the value saved anyway is the classic
+  click-to-edit trap.
+- **The status is a group of four buttons** (`.estados`), one per value of
+  `ESTADOS_PROPIEDAD`, the current one marked with `aria-pressed` and the
+  colour its badge has in the grid. This IS the publish control: the old
+  footer toggle could only swing between `borrador` and `publicada`, so
+  marking a flat as reserved meant opening the form.
+- **Photos are added and removed here**, not in the form (see below).
+
+The footer therefore carries exactly one action, `Editar`, and one primary
+per view holds.
+
+### The form (create and edit)
+
+`EditSheet` wraps the kit's `Sheet`: fields in one column, one primary that
+saves and one ghost that gives up, and three things the old inline form did
+not have.
+
+- **The fields are a real `<form>`**, so Enter saves and `required` is the
+  browser's job. The submit button sits in the panel's footer, outside the
+  form element, and reaches it through `form="<id>"`.
+- **It cannot be closed while it is saving.** A panel that vanishes mid-save
+  invites a second entry, and the first one lands seconds later.
+- **Inputs are controlled**, held in one `PropertyFields` object of strings
+  (`src/crm/property-form.ts`). The old form was uncontrolled
+  (`defaultValue`) and depended on a `key` remount that included
+  `owners.length`, because an edit opened before the owners had loaded would
+  resolve the select to the empty option and silently unlink the owner on
+  save. With controlled fields that whole class of bug is gone, and so is the
+  key.
+
+`fieldsOf(record)` maps a stored record into the form and **a zero number
+becomes an empty box**: PocketBase answers `0` for a number field that was
+never set, and a form offering "0 baths" invites the agent to save a lie. The
+same reasoning made `fmtPrecio` render `0` as `—` rather than "AED 0".
+
+Saving returns to `ficha` mode on the record that was just written (the one
+the POST or PATCH returned), never to the grid: the next thing an agent does
+with a property they have just described is add its photos.
+
+The owner picker is the ui kit's `Select`, not a native one, because it has to
+carry a row that is a verb rather than a value: `+ Nuevo propietario…`, which
+opens `OwnerDialog` over the sheet. That row sits **second**, right under
+`Sin propietario` — this agency has 202 owners, and at the bottom of the list
+it would be a row nobody ever scrolls to. Creating an owner links it to the
+field and leaves the form exactly as it was.
+
+`src/crm/OwnerDialog.tsx` is a kit `Dialog` with name, phone, email and a
+consent `Toggle`; consent stores `consentimiento_en` with the moment it was
+given, because that instant is the proof and cannot be recovered later from
+the row's creation date.
 
 ### PATCH payload semantics
 
-Edit sends **every** field, including empty ones — omitting them (as the
-create path does) would silently keep the old value in the backend:
+`payloadOf(fields, editing)` in `src/crm/property-form.ts` is pure and unit
+tested (`property-form.test.mjs`, 9 assertions) — it is the subtlest thing on
+this page and it had no test before. A create and an edit build **different**
+payloads out of the same fields:
 
-| Field kind | Empty in the form sends | Effect |
+| Field kind | Create (POST) | Edit (PATCH) |
 |---|---|---|
-| Text (`municipio`, `direccion`, `descripcion`, `propietario`) | `''` | clears the field |
-| Number (`precio`, `habitaciones`, `banos`, `superficie`) | `null` | clears the field |
-| `estado` | never sent | publish state untouched by edits |
+| Text (`municipio`, `direccion`, `descripcion`, `propietario`) | omitted when empty | `''`, which clears it |
+| Number (`precio`, `habitaciones`, `banos`, `superficie`) | omitted when empty | `null`, which clears it |
+| `estado` | `'borrador'` | never sent |
 
-Equivalent request (what `actualizarPropiedad` issues without new photos):
+Omitting a field in a PATCH leaves the stored value alone, so a price the
+agent **cleared** would silently survive; sending `null` on a create would
+write a value nobody typed. Equivalent request for an edit:
 
 ```bash
 curl -X PATCH "$PB/api/collections/propiedades/records/$ID" \
@@ -181,25 +229,27 @@ curl -X PATCH "$PB/api/collections/propiedades/records/$ID" \
   -d '{"titulo":"Piso centro","municipio":"","precio":null, ...}'
 ```
 
-The create path is the opposite: an explicit payload with **only non-empty
-fields** plus `estado: 'borrador'` (empty multipart parts trip the backend).
+Both calls are now **plain JSON**. Photos left the form, so the multipart
+path with `@jsonPayload` (which existed only to keep the clearing `null`s
+alive beside the files) is gone, and with it the double-submit hazard of
+appending the same photos twice.
 
-### Photos on edit
+### Photos, on the record
 
-New files are **appended** using PocketBase's `fotos+` multipart key —
-existing photos are kept. Plain `fotos` on a PATCH would replace the whole
-set (silent data loss). In the multipart case the scalar fields travel in a
-single `@jsonPayload` part (PocketBase merges it as JSON) so the `null`s
-that clear numeric fields survive — as empty multipart parts they would trip
-the backend:
+The record shows every photo as a grid of thumbnails (`.ficha-fotos`, a
+`<ul>`) and a file input beneath it. Choosing files uploads them immediately:
+there is no second button, because on a phone the picker IS the button.
 
 ```js
-fd.append('@jsonPayload', JSON.stringify(payload)); // '' and null preserved
-for (const f of fotos) fd.append('fotos+', f, f.name); // append, not replace
+for (const f of fotos) fd.append('fotos+', f, f.name); // append, never replace
 ```
 
-The file input still carries the hint "Las fotos nuevas se añaden a las
-existentes" in edit mode.
+New files are **appended** with PocketBase's `fotos+` multipart key. Plain
+`fotos` on a PATCH would replace the whole set (silent data loss). Each file
+goes through `normalizaFoto` first (HEIC and anything over 4.5 MB is
+re-encoded to JPEG, max 2000px), and a neutral progress toast
+(`prop.preparandoFotos`, `id: 'prop-fotos'`) shows while that runs, dismissed
+in the `finally` so it never outlives its result.
 
 Photo URL helpers in `api.ts`:
 
@@ -209,59 +259,32 @@ Photo URL helpers in `api.ts`:
 | `fotosUrls(p, thumb = true)` | array with **every** photo URL, in backend order |
 | `quitarFoto(id, filename)` | PATCH `{ 'fotos-': [filename] }`; resolves to the updated record — file deletion is permanent |
 
-### Current photos in the edit form
-
-Edit mode renders a `.fotos-actuales` block between the propietario select
-and the file input: a visible count ("4 fotos", or "Sin fotos todavía") plus
-a horizontally scrollable thumbnail strip (`.tira-fotos`) of every current
-photo via `fotosUrls(editando)` — `600x400` thumbs, lazy-loaded, backend
-order. This is the upload feedback the form used to lack: new files are
-appended at the **end** of `fotos`, so after saving they show up at the end
-of the strip.
-
 ### Deleting a photo
 
 Each thumbnail overlays a close button (`.quitar-foto`, 44×44px touch target,
-an inline SVG `IconClose` from `src/components/kit/Icono.tsx` rather than a
-`✕` character; `aria-label` = `prop.eliminarFoto`) that removes exactly that
-photo. The button is wrapped in the ui kit's `Tooltip`, which shows
-`prop.eliminarFotoTitle` on hover and focus in place of the old `title`
-attribute; the `aria-label` stays on the button, because a tooltip is not one:
-
-```tsx
-<Tooltip label={t('prop.eliminarFotoTitle')}>
-  <button type="button" className="quitar-foto" aria-label={t('prop.eliminarFoto', { n: i + 1 })}
-    disabled={enviando || borrando !== null} onClick={() => borrarFoto(editando, nombre)}><IconClose /></button>
-</Tooltip>
-```
-
-Mechanics:
+an inline SVG `IconClose` rather than a `✕` character; `aria-label` =
+`prop.eliminarFoto`) that removes exactly that photo. The button is wrapped in
+the ui kit's `Tooltip`, which shows `prop.eliminarFotoTitle` on hover and
+focus; the `aria-label` stays on the button, because a tooltip is not one.
 
 - **Confirm-gated**: PocketBase deletes the file from disk permanently, so
   the click first asks `confirm('¿Eliminar esta foto? El borrado es
   permanente.')`.
-- The call is `quitarFoto(id, filename)` — an immediate JSON PATCH using
-  PocketBase's `fotos-` modifier (the mirror of `fotos+`), equivalent to:
+- **One write at a time**: `borrando` holds the in-flight filename and
+  `subiendo` the upload; each bails out if the other is running, because two
+  concurrent PATCHes on the same record can land out of order.
+- **The panel does not wait for the list.** Every mutation stores the record
+  it returned in `fresco`, which the panel prefers over the list copy for the
+  open id until it closes. Without it the panel would blink shut after a
+  create (the list reloads asynchronously) and a photo just uploaded would
+  take a round trip to appear.
 
-```bash
-curl -X PATCH "$PB/api/collections/propiedades/records/$ID" \
-  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
-  -d '{"fotos-": ["cocina_ab12cd34.jpg"]}'
-```
+### What the record shows is never a stale copy
 
-- **One deletion at a time**: `borrando` holds the in-flight filename; every
-  delete button and the `Guardar` button are disabled meanwhile (and both `borrarFoto`
-  and submit bail out early) — two concurrent PATCHes on the same record
-  could land out of order.
-- **Refresh without losing edits**: on success the open form is updated with
-  the record the PATCH returns, but **only if that same property is still
-  open** (`setForm((f) => typeof f === 'object' && f.id === actualizada.id ?
-  actualizada : f)`) — if the form was closed or another record opened while
-  the response was in flight, it is left alone. The form key doesn't change,
-  so the uncontrolled inputs keep any half-edited values; the card grid is
-  refreshed via `recargar()`.
-- Errors surface as an error toast (`prop.errorFoto`, "No se pudo eliminar la
-  foto: …").
+`ficha` is resolved on every render from the open id: `fresco` when it matches,
+otherwise the row in the list. There is no second copy of the record in state
+that can disagree with the grid — the bug the previous version avoided with a
+`key` remount, avoided here by not keeping the copy at all.
 
 ## Photo-count badge on cards
 
@@ -286,32 +309,33 @@ count is the visible proof that it worked.
   photos. Otherwise the `.sinfoto` placeholder shows `IconCamera` at
   `size={32}` with `aria-hidden="true"`; no emoji in either place.
 
-## Form layout (`.alta` in crm.css)
+## Form and record layout (crm.css)
 
-- `max-width: 720px`, vertical flex with `--space-3` gaps, heading switches
-  between "Nueva propiedad" and `Editar "{titulo}"`.
-- `.fila2`: 2-column grid for título/municipio/dirección; the first label
-  (título) spans full width (`grid-column: 1 / -1`).
-- `.fila`: existing 4-column grid for the numeric row (precio/hab/baños/m²).
-- `.acciones`: flex row with `Guardar` (`.primario`, shows "Guardando…"
-  while submitting) and a secondary `Cancelar` button that closes the form.
-- `.pista`: muted helper text (used for the photo count and the
-  photo-append note in edit mode).
-- `.fotos-actuales` / `.tira-fotos`: edit-mode block with the photo count
-  and a horizontally scrollable strip of 132×88 thumbnails; each `<li>` is
-  `position: relative` so `.quitar-foto` (44×44px, top-right, danger
-  background on hover, dimmed when disabled) can overlay its image.
-- Card-side companions (outside `.alta`): `.portada` wraps the cover image
-  with `position: relative` and `.n-fotos` is the pill badge pinned to its
-  bottom-right corner.
+The `.alta` block that unfolded over the grid is gone. What is left is scoped
+to the panel and shared with the rest of the CRM:
 
-Mobile collapses (desktop untouched, everything behind media queries):
+- `.campo`: one field, label above its control, full width — the same class
+  the lead panel uses.
+- `.campos-2`: two columns where they fit, one column under 420px. The four
+  numbers of a property in a single row only fitted on a laptop, and the agent
+  works on a phone.
+- `.ficha-precio`: the price as a button that does not look like one until it
+  is hovered (`--primary` on hover); `.precio-form` is the popover's row.
+- `.estados` / `.estado-btn`: the four status buttons; the active one takes
+  the colour its badge has in the grid (`--ok`, `--muted`, `--warn`,
+  `--primary`).
+- `.ficha-fotos`: a two-column grid of 3:2 thumbnails, each `<li>`
+  `position: relative` so `.quitar-foto` can overlay it.
+- `.ficha-dueno`: the owner line, label in small caps like `.ficha-franja` on
+  the lead.
+- `.pista`: muted helper text (now global, it was `.alta .pista`).
 
-| Breakpoint | `.fila` | `.fila2` | `.acciones` |
-|---|---|---|---|
-| ≤719.98px | 2 columns | 1 column | row |
-| ≤479.98px | 1 column | 1 column | stacked, stretched |
+All of it is token-based (`--surface`, `--border`, `--radius*`, `--space-*`,
+`--duration-press`, `--ease-out`); no literal colour, curve or duration, which
+is what the E2 gate greps for.
 
-All styling is token-based (`--surface`, `--border`, `--radius*`,
-`--space-*`) and scoped under `.alta` so Login, Kanban and Importar are
-unaffected.
+One fix that belongs to the kit rather than to this screen landed with it:
+`.kit-toggle` now states `flex-direction: row`. The CRM styles every `label`
+as a column (field above its input) and a toggle is a label too, so the switch
+had been rendering above its own text — visible in Ajustes as well as in the
+new owner dialog.

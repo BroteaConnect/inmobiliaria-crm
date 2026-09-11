@@ -5,16 +5,25 @@ import { list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
 // La moneda es un dato del negocio (`negocio.moneda` en Ajustes), no una
 // constante: quien pinta el precio la pasa. Intl decide el formato por idioma
 // ("1.234.567 AED" en es, "AED 1,234,567" en en).
+// A property with no price is a property whose price nobody has set yet, and
+// PocketBase answers 0 for a number field that was never written: printing
+// "AED 0" on the card of every imported flat was the app saying it is free.
 export const fmtPrecio = (locale: string, n: number, moneda: string) =>
-  (n != null && Number.isFinite(n) ? fmtMoney(locale, n, moneda) : '—');
+  (n != null && Number.isFinite(n) && n !== 0 ? fmtMoney(locale, n, moneda) : '—');
 
 export const ETAPAS = ['nuevo', 'contactado', 'visita', 'oferta', 'reservado', 'vendido', 'nutriendo'] as const;
 export type Etapa = (typeof ETAPAS)[number];
 
+// The four states of a property, in the order they happen. They are the
+// publish control: the record's status group sets any of them, which a
+// two-way "publish / unpublish" toggle could never do.
+export const ESTADOS_PROPIEDAD = ['borrador', 'publicada', 'reservada', 'vendida'] as const;
+export type EstadoPropiedad = (typeof ESTADOS_PROPIEDAD)[number];
+
 export interface Propiedad {
   id: string; collectionId: string; titulo: string; direccion: string; municipio: string;
   precio: number; habitaciones: number; banos: number; superficie: number;
-  descripcion: string; estado: 'borrador' | 'publicada' | 'reservada' | 'vendida';
+  descripcion: string; estado: EstadoPropiedad;
   fotos: string[]; propietario: string;
 }
 
@@ -306,13 +315,15 @@ export async function saveSetting(key: string, value: unknown, note?: string) {
 const MIME_OK = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
 const FOTO_MAX = 4.5 * 1024 * 1024;
 
-export async function normalizaFoto(f: File): Promise<File> {
+// `locale` because these two failures are shown to the agent: they were the
+// last Spanish sentences the English UI could still print.
+export async function normalizaFoto(f: File, locale = 'es'): Promise<File> {
   if (MIME_OK.includes(f.type) && f.size <= FOTO_MAX) return f;
   let bmp: ImageBitmap;
   try {
     bmp = await createImageBitmap(f);
   } catch {
-    throw new Error(`"${f.name}": este navegador no puede procesar ese formato de imagen — usa JPG, PNG o WebP.`);
+    throw new Error(t(locale, 'prop.fotoFormato', { nombre: f.name }));
   }
   const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
   const canvas = document.createElement('canvas');
@@ -320,7 +331,7 @@ export async function normalizaFoto(f: File): Promise<File> {
   canvas.height = Math.round(bmp.height * scale);
   canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise<Blob>((res, rej) =>
-    canvas.toBlob((b) => (b ? res(b) : rej(new Error(`"${f.name}": no se pudo convertir a JPEG.`))), 'image/jpeg', 0.85));
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error(t(locale, 'prop.fotoConversion', { nombre: f.name })))), 'image/jpeg', 0.85));
   return new File([blob], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
 }
 

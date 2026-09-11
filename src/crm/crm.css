@@ -125,27 +125,24 @@ select:focus-visible, textarea:focus-visible {
 .ficha .cuerpo { padding: var(--space-3); display: flex; flex-direction: column; gap: 4px; }
 .ficha .meta { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
 .ficha .precio { font-family: var(--font-display); color: var(--primary); font-variant-numeric: tabular-nums; }
+/* El estado, en la rejilla y en la ficha. El color va en el FONDO y la palabra
+   en `--text`: escrita en su propio color sobre su propio tinte, "publicada"
+   medía 2.8:1 y "reservada" 2.0:1 en modo claro, por debajo del 4.5:1 que pide
+   un texto de .72rem — y es la única cosa que dice en qué estado está el piso.
+   Con el tinte debajo mide 12:1 o más en los dos esquemas, y el tono sigue
+   distinguiéndose de un vistazo. */
 .estado { align-self: start; font-size: .72rem; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; border-radius: 999px; padding: 2px 10px; }
-.estado-publicada { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
-.estado-borrador { background: color-mix(in srgb, var(--muted) 15%, transparent); color: var(--muted); }
-.estado-reservada { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
-.estado-vendida { background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary); }
+  text-transform: uppercase; border-radius: 999px; padding: 2px 10px; color: var(--text); }
+.estado-publicada { background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.estado-borrador { background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.estado-reservada { background: color-mix(in srgb, var(--warn) 22%, transparent); }
+.estado-vendida { background: color-mix(in srgb, var(--primary) 22%, transparent); }
 .ficha button { margin-top: 4px; border: 1px solid var(--border); background: var(--bg);
   color: var(--text); border-radius: var(--radius); padding: .35rem; font-size: .85rem; }
-.alta { background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-4); margin-top: var(--space-4);
-  display: flex; flex-direction: column; gap: var(--space-3); max-width: 720px; }
-.alta h2 { font-size: 1.05rem; margin: 0; }
-.alta .fila { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
-.alta .fila2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-.alta .fila2 label:first-child { grid-column: 1 / -1; } /* Título a todo el ancho */
-.alta .pista { color: var(--muted); font-weight: 400; font-size: .8rem; }
-.alta .acciones { display: flex; gap: var(--space-3); }
-.alta .acciones button:not(.primario) { background: none; color: var(--muted);
-  border: 1px solid var(--border); border-radius: var(--radius); padding: .55rem 1.3rem;
-  min-height: 2.75rem; }
-.alta .acciones button:not(.primario):hover { color: var(--text); border-color: var(--muted); }
+/* El alta y la edición de una propiedad son el panel de la ficha, con los
+   mismos `.campo` que el alta de lead (ver `.campos-2` más abajo): el bloque
+   `.alta`, que se desplegaba sobre la rejilla, ya no existe. */
+.pista { color: var(--muted); font-weight: 400; font-size: .8rem; margin: 0; }
 
 /* --- fotos: contador en la card + tira de miniaturas al editar --- */
 .portada { position: relative; }
@@ -344,11 +341,51 @@ select:focus-visible, textarea:focus-visible {
   font: inherit; color: inherit; cursor: pointer; }
 .ficha .cuerpo:hover strong { text-decoration: underline; }
 
-.ficha-precio { margin: 0; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* El precio se edita pulsándolo: es un botón que no parece un botón hasta que
+   lo tocas, porque el dato es lo que importa y el control es secundario. */
+.ficha-precio { margin: 0; padding: 0 var(--space-2) 0 0; border: 0; background: none;
+  color: var(--text); font: inherit; font-size: 1.4rem; font-weight: 800;
+  font-variant-numeric: tabular-nums; cursor: pointer; border-radius: var(--radius);
+  text-align: start; min-height: 2.75rem;
+  transition: color var(--duration-press) var(--ease-out); }
+.ficha-precio:hover { color: var(--primary); }
+/* Sin precio no es un cero ni una raya suelta: es una invitación a ponerlo. */
+.ficha-precio.vacio { font-size: 1rem; font-weight: 600; color: var(--muted); }
+.ficha-precio.vacio:hover { color: var(--primary); }
+.precio-form { display: flex; gap: var(--space-2); align-items: center; }
+.precio-form input { flex: 1 1 auto; min-width: 0; min-height: 2.75rem; }
 .ficha-dir { margin: var(--space-2) 0 0; color: var(--muted); }
 .ficha-desc { margin: var(--space-3) 0 0; white-space: pre-wrap; }
-.ficha-fotos { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
-.ficha-fotos img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--radius); }
+.ficha-dueno { margin: var(--space-3) 0 0; }
+.ficha-dueno span { font-weight: 600; font-size: .75rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin-inline-end: var(--space-2); }
+
+/* Las fotos de la ficha: rejilla con su aspa, como la tira del formulario que
+   sustituye. Se suben y se borran mirando la propiedad, no editándola. */
+.ficha-fotos { list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+.ficha-fotos li { position: relative; }
+.ficha-fotos img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover;
+  border-radius: var(--radius); }
+
+/* Los cuatro estados de una propiedad. Es el control de publicación, y el
+   activo lleva el mismo color que su etiqueta en la rejilla. */
+/* El activo se distingue por tres cosas a la vez y ninguna es el color del
+   texto: el tinte de fondo, el borde de 2px en el color del estado y el peso.
+   Un relleno sólido con la etiqueta en `--bg` era ilegible (ver `.estado`). */
+.estados { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.estado-btn { border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--muted); padding: .3rem .8rem; min-height: 2.75rem;
+  font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
+  transition: color var(--duration-press) var(--ease-out),
+              border-color var(--duration-press) var(--ease-out); }
+.estado-btn:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+.estado-btn:disabled { cursor: default; opacity: .6; }
+.estado-btn.activa { color: var(--text); font-weight: 700; }
+.estado-btn.estado-publicada.activa { background: color-mix(in srgb, var(--ok) 22%, transparent); border-color: var(--ok); }
+.estado-btn.estado-borrador.activa { background: color-mix(in srgb, var(--muted) 22%, transparent); border-color: var(--muted); }
+.estado-btn.estado-reservada.activa { background: color-mix(in srgb, var(--warn) 22%, transparent); border-color: var(--warn); }
+.estado-btn.estado-vendida.activa { background: color-mix(in srgb, var(--primary) 22%, transparent); border-color: var(--primary); }
 
 /* Prioridad en tres estados. El color ES el mensaje: sin número, sin rojo — el
    rojo pertenece a la alerta y a nada más, que es lo que la hace leerse. */
@@ -366,7 +403,13 @@ select:focus-visible, textarea:focus-visible {
    than edited in Pager.css, which is the brick's copy. */
 .pager button { min-height: 2.75rem; }
 
-/* Campos del alta manual, dentro del panel. */
+/* Campos de cualquier formulario del CRM, dentro de su panel. */
 .campo { display: block; margin-bottom: var(--space-3); font-weight: 600; font-size: .85rem; }
 .campo input, .campo select, .campo textarea { display: block; width: 100%; margin-top: .3rem;
   font-weight: 400; }
+/* Dos columnas donde caben, una donde no: los cuatro números de una propiedad
+   en una sola fila solo caben en un portátil, y la agente usa el móvil. */
+.campos-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-3); }
+@media (max-width: 419.98px) {
+  .campos-2 { grid-template-columns: 1fr; }
+}
