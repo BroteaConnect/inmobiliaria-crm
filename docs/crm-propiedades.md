@@ -13,11 +13,20 @@ shared PocketBase. Scope: this repo only — the public catalog that consumes
 | Create | `+ Nueva propiedad` → form → Guardar | `crearPropiedad` (POST) | always `borrador` |
 | Publish / unpublish | ghost button in the side panel footer (shown only for `borrador`/`publicada`) | `actualizarPropiedad(id, { estado })` | `publicada` ↔ `borrador` |
 | Edit | primary `Edit` button in the side panel footer (any estado) | `actualizarPropiedad(id, payload)` (PATCH) | unchanged: edit never sends `estado` |
-| Delete photo | `IconClose` button (`.quitar-foto`) on a thumbnail in the edit form (confirm-gated) | `quitarFoto(id, filename)` (PATCH `fotos-`) | unchanged |
+| Delete photo | `IconClose` button (`.quitar-foto`, named by a ui kit `Tooltip`) on a thumbnail in the edit form (confirm-gated) | `quitarFoto(id, filename)` (PATCH `fotos-`) | unchanged |
 
 A card has one way in: its body (`.ficha .cuerpo`) is a button that opens the
-property in the kit `SidePanel`; publishing and editing are decided there,
-looking at the record, not from a grid tile.
+property in the kit `SidePanel` (the ui kit's `Sheet` since 2026-09-11, see
+[docs/crm-interface.md](crm-interface.md)); publishing and editing are decided
+there, looking at the record, not from a grid tile. A failed publish
+(`prop.errorEstado`) is said inside the open panel (the `error` prop,
+`role="alert"` above the footer) and as an error toast; the inline message is
+cleared when another record opens.
+
+Outcomes on this page are toasts from the ui kit's `useToast()`, never a
+banner that pushes the grid down: `prop.guardada` / `prop.actualizada` (`ok`),
+`prop.errorGuardar`, `prop.errorFoto`, `prop.errorEstado` and
+`prop.errorBuscar` (`error`).
 
 Publishing is instant on the public site (it reads client-side with the
 `estado="publicada"` filter; no rebuild).
@@ -58,9 +67,17 @@ Details that matter:
   response is only applied if its query is still the one typed. The
   non-debounced full reload is guarded too (it could otherwise arrive after
   a later search and overwrite its results).
-- **Errors** surface in the standard message banner (`prop.errorBuscar`,
-  `.aviso.aviso-error`, `role="status"`), set from `remoto.error` by an
-  effect. The list states below decide what else renders.
+- **Errors** surface as an error toast (`prop.errorBuscar`), fired from
+  `remoto.error` by an effect with a stable id, so a search that fails on
+  every keystroke shows one toast replaced in place, not a stack:
+
+```tsx
+useEffect(() => {
+  if (remoto.error) toast({ id: 'prop-search', tone: 'error', title: t('prop.errorBuscar', { error: remoto.error.message }) });
+}, [remoto.error, t, toast]);
+```
+
+  The list states below decide what else renders.
 - **Reloads respect the search**: `recargar()` (after create/edit/photo
   changes) re-runs the active search instead of resetting the grid.
 - **Backend seam**: the query is isolated in `buscarPropiedades()` so the
@@ -86,9 +103,9 @@ results" keeps its own paragraph because it names the search:
 | Loading | `remoto.loading` | `<p class="list-status">` with `list.loading` |
 | Empty collection | not loading, no error, zero items, query shorter than 2 chars | `<p class="list-status">` with `list.empty` |
 | No results | not loading, query of 2+ chars, zero items | `<p class="sin-resultados">` with `prop.sinResultados` and the query |
-| Error | `remoto.error` set | the `prop.errorBuscar` banner (above); `ListStatus` is not given the `error` prop |
+| Error | `remoto.error` set | the `prop-search` toast with `prop.errorBuscar` (above); `ListStatus` is not given the `error` prop |
 
-`empty` requires `!remoto.error`, so the error banner and `list.empty` never
+`empty` requires `!remoto.error`, so the error toast and `list.empty` never
 render together (before this fix both showed after a failed load). Both
 `ListStatus` and the "no results" paragraph are suppressed while a request is
 in flight.
@@ -127,7 +144,10 @@ that record. Mechanics:
   the propietarios list has loaded, the select remounts once owners arrive
   so its `defaultValue` resolves (otherwise it would show the empty option
   and saving would unlink the owner). The empty option reads
-  `prop.sinPropietario` ("No owner" / "Sin propietario"), not a dash.
+  `prop.sinPropietario` ("No owner" / "Sin propietario"), not a dash. The
+  owner field stays a native `<select>`: it is a plain form field that posts,
+  not a control that drives the screen, so the ui kit's `Select` is not used
+  here (the rule is in [docs/crm-interface.md](crm-interface.md)).
 - Opening edit mode scrolls the form into view (the clicked card may be far
   down the grid).
 - Submit is double-click-guarded (`enviando` state disables both buttons and
@@ -135,6 +155,12 @@ that record. Mechanics:
   `fotos+`. The guard also bails while a photo deletion is in flight
   (`borrando`): two concurrent PATCHes on the same record could land out of
   order.
+- The outcome is a toast: `prop.guardada` or `prop.actualizada` (`ok`) on
+  success, `prop.errorGuardar` (`error`) on failure. When photos are attached,
+  a neutral "preparing photos" toast (`prop.preparandoFotos`, `id:
+  'prop-fotos'`) shows while `normalizaFoto` runs and is dismissed in the
+  submit's `finally` (`toast.dismiss('prop-fotos')`), so it is gone the moment
+  the outcome arrives, on success and on failure alike.
 
 ### PATCH payload semantics
 
@@ -198,7 +224,18 @@ of the strip.
 Each thumbnail overlays a close button (`.quitar-foto`, 44×44px touch target,
 an inline SVG `IconClose` from `src/components/kit/Icono.tsx` rather than a
 `✕` character; `aria-label` = `prop.eliminarFoto`) that removes exactly that
-photo. Mechanics:
+photo. The button is wrapped in the ui kit's `Tooltip`, which shows
+`prop.eliminarFotoTitle` on hover and focus in place of the old `title`
+attribute; the `aria-label` stays on the button, because a tooltip is not one:
+
+```tsx
+<Tooltip label={t('prop.eliminarFotoTitle')}>
+  <button type="button" className="quitar-foto" aria-label={t('prop.eliminarFoto', { n: i + 1 })}
+    disabled={enviando || borrando !== null} onClick={() => borrarFoto(editando, nombre)}><IconClose /></button>
+</Tooltip>
+```
+
+Mechanics:
 
 - **Confirm-gated**: PocketBase deletes the file from disk permanently, so
   the click first asks `confirm('¿Eliminar esta foto? El borrado es
@@ -223,8 +260,8 @@ curl -X PATCH "$PB/api/collections/propiedades/records/$ID" \
   the response was in flight, it is left alone. The form key doesn't change,
   so the uncontrolled inputs keep any half-edited values; the card grid is
   refreshed via `recargar()`.
-- Errors surface in the standard `.aviso-error` banner
-  ("No se pudo eliminar la foto: …").
+- Errors surface as an error toast (`prop.errorFoto`, "No se pudo eliminar la
+  foto: …").
 
 ## Photo-count badge on cards
 

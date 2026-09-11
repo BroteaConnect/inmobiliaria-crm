@@ -1,8 +1,9 @@
 # CRM interface conventions
 
 The rules every CRM screen follows, for whoever adds the next one. They are
-what `src/crm/crm.css`, `src/components/kit/kit.css`, `src/styles/base.css`
-and `src/components/kit/Icono.tsx` already do; a new screen inherits them
+what `src/crm/crm.css`, `src/components/kit/kit.css`, `src/styles/base.css`,
+`src/components/kit/Icono.tsx` and the ui kit (`src/components/ui/`) already
+do; a new screen inherits them
 rather than inventing its own. Screen-specific behaviour lives in
 [docs/crm-leads.md](crm-leads.md) and
 [docs/crm-propiedades.md](crm-propiedades.md).
@@ -49,8 +50,9 @@ in a rule; everything else is tokens only.
   `scale: var(--press-scale)` on `:active`. `.primario` used to stack a second
   transition and a `translateY(1px)` on top of it; it no longer does.
 - **Reduced motion** is handled once, in `base.css`: transitions and
-  animations collapse to `0.01ms`. The panel entrance is additionally wrapped
-  in `@media (prefers-reduced-motion: no-preference)`.
+  animations collapse to `0.01ms`. The ui kit's `ui.css` relies on that too;
+  its entrances and exits (`ui-fade`, `ui-rise`, `ui-slide`) carry no
+  reduced-motion query of their own.
 - **Pointer-only effects stay pointer-only**: the property card lift
   (`.ficha:hover { transform: translateY(-2px) }`) is inside
   `@media (hover: hover) and (pointer: fine)`, so a finger tapping a card does
@@ -76,9 +78,13 @@ stay at `0`.
 
 ## Icons: one set, drawn not typed
 
-`src/components/kit/Icono.tsx` is the whole icon set. Every icon is an inline
-SVG with `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`,
+`src/components/kit/Icono.tsx` is the icon set of the screens. Every icon is an
+inline SVG with `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`,
 `strokeWidth={2}`, round caps and joins, `aria-hidden` and `focusable=false`.
+The ui kit brings its own three glyphs in `src/components/ui/icons.tsx`
+(`IconClose`, `IconChevron`, `IconCheck`; same anatomy, `strokeWidth` 1.75)
+for the close affordance, the select trigger and the selected option; they
+are the brick's, not this set's, and a screen keeps importing from `Icono.tsx`.
 Filled glyphs (`IconoWhatsApp`, `IconDots`) use `fill="currentColor"
 stroke="none"`. Because they inherit `currentColor`, the same icon works on a
 ghost button, a primary button and the dark active tab.
@@ -94,7 +100,7 @@ ghost button, a primary button and the dark active tab.
 | `IconDots` | filled three dots | yes | `TabBar` More (20) |
 | `IconArrowLeft` | arrow | yes | Kanban previous stage (16) |
 | `IconArrowRight` | arrow | yes | Kanban next stage (16) |
-| `IconClose` | cross | yes | `SidePanel` close (20), `ListCard` postpone (16), `.quitar-foto` (16) |
+| `IconClose` | cross | yes | `ListCard` postpone (16), `.quitar-foto` (16). The dialog, sheet and toast close buttons use the ui kit's own `IconClose` (`src/components/ui/icons.tsx`) |
 | `IconCamera` | camera | yes | `.n-fotos` badge (12), `.sinfoto` placeholder (32) |
 
 `size` is in CSS pixels and sets both `width` and `height` (default 16), so a
@@ -127,7 +133,7 @@ desktop header, which is for a pointer, is 40px.
 |---|---|
 | `.kit-btn`, `.primario`, `.alta .acciones button`, `.importar .archivo input`, `.prioridad .nivel`, `.pager button`, `.login .enlace` | `min-height: 2.75rem` |
 | `.ui-close` (dialog and sheet), `.menu-btn`, `.quitar-foto` | `width: 44px; height: 44px` |
-| `.etapa-chip`, `.filtros` select and input, `.buscador` | `min-height: 44px` |
+| `.etapa-chip`, `.filtros` input, `.ui-select` (the board's property filter, in `ui.css`), `.buscador` | `min-height: 44px` |
 | `.lead .mover button` | 44px wide, 36px drawn, `::after { inset: -4px 0 }` |
 | `.lead-abrir` | about 34px drawn, `::after { inset: -5px 0 }` |
 | `.kit-card-aplazar` | 28px drawn, `::after { inset: -8px }` |
@@ -217,7 +223,13 @@ same cue the kit's `.ui-close:hover` uses.
 Since the platform's `ui` brick (`brotea add ui`, 2026-09-11) the dialogs,
 selects, menus, popovers, tabs, tooltips and toasts of this CRM are
 `src/components/ui/` — Radix Primitives behaviour, `ui.css` in theme tokens,
-one anatomy per component. A screen does not hand-roll one of those and does
+one anatomy per component. `brotea.json` declares it as `ui` version `1.2.0`
+with the single dependency `radix-ui` (`^1.6.7` in `package.json`) and lists
+the twelve files under `src/components/ui/` as the brick's, so an edit there
+is a platform change, not a CRM one. Everything is
+exported from `src/components/ui/index.ts` (`Dialog`, `Sheet`, `Select`,
+`Menu`, `Popover`, `Tabs`, `Tooltip`, `useToast`, `ToastProvider`,
+`UiProvider`). A screen does not hand-roll one of those and does
 not import a component library for it. The brick's `wire.md` (platform repo,
 `feature-templates/ui/`) carries the decision — Radix, not shadcn, because
 shadcn brings Tailwind and CSS the E2 gate counts as debt — and the rules;
