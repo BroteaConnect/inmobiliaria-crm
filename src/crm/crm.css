@@ -187,15 +187,12 @@ select:focus-visible, textarea:focus-visible {
 .envio { font-weight: 700; }
 .envio-abierto, .envio-click { color: var(--ok); }
 .envio-error { color: var(--danger); }
-.compositor { background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: var(--space-4);
-  margin-bottom: var(--space-4); display: flex; flex-direction: column;
-  gap: var(--space-3); max-width: 620px; }
-.compositor h2 { font-size: 1.05rem; margin: 0; }
-.compositor .dest { color: var(--muted); font-weight: 400; font-size: .85rem; }
-.compositor .botones { display: flex; gap: var(--space-3); }
-.compositor .botones button:not(.primario) { background: none; color: var(--muted);
-  border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem 1rem; }
+/* The email compositor is the kit's Dialog (src/components/ui); its fields are
+   `.campo`, like the new-lead panel's. The filter select on the board is the
+   kit's Select and needs a width the trigger cannot guess from its options. */
+.filtros .filtro-propiedad { min-width: 14rem; max-width: 100%; }
+/* A kit Select as a form field takes the row, like the inputs beside it. */
+.campo .ui-select { display: flex; width: 100%; margin-top: .3rem; font-weight: 400; }
 
 .aviso { border-radius: var(--radius); padding: var(--space-3); margin: var(--space-3) 0 0; font-weight: 600; }
 .aviso-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
@@ -337,9 +334,9 @@ select:focus-visible, textarea:focus-visible {
 .ficha-franja { margin: 0 0 var(--space-4); }
 .ficha-franja span { font-weight: 600; font-size: .75rem; letter-spacing: .08em;
                      text-transform: uppercase; color: var(--muted); margin-inline-end: var(--space-2); }
-.kit-panel-body h3 { margin: var(--space-5) 0 var(--space-2); font-size: .82rem;
+.ui-sheet-body h3 { margin: var(--space-5) 0 var(--space-2); font-size: .82rem;
   text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.kit-panel-body h3:first-child { margin-top: 0; }
+.ui-sheet-body h3:first-child { margin-top: 0; }
 .ficha-nota { width: 100%; }
 
 /* The property card's body is a button now: same look, one way in. */

@@ -228,7 +228,6 @@
   "nav.propiedades": "Propiedades",
   "nav.salir": "Salir",
   "nav.web": "Ver web pública ↗",
-  "panel.cerrar": "Cerrar",
   "priority.high": "Alta",
   "priority.low": "Baja",
   "priority.medium": "Media",
@@ -294,5 +293,7 @@
   "today.titulo": "Hoy",
   "today.vacio": "Nada pendiente. La cola está limpia.",
   "today.whatsapp": "WhatsApp",
-  "today.whatsapp.mensaje": "Hola {nombre}, te escribo de la inmobiliaria."
+  "today.whatsapp.mensaje": "Hola {nombre}, te escribo de la inmobiliaria.",
+  "ui.close": "Cerrar",
+  "ui.notifications": "Avisos"
 }

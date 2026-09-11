@@ -1,0 +1,324 @@
+/* ui.css — the appearance of the primitives, in tokens and nothing else.
+   Radix ships behaviour (focus, keyboard, portals, aria) and no styles; this
+   file is what makes it look like the app it lands in. No hex colour, no
+   literal curve, no bare duration: the theme owns those, and the fleet's E2
+   gate reads this file. Reduced motion is already handled by base.css. */
+
+/* -- surfaces --------------------------------------------------------------- */
+/* Everything here floats above the app's own sticky header and fixed tab bar
+   (an app's layers stop well under 100); the toast viewport is above all. */
+.ui-overlay, .ui-dialog, .ui-sheet, .ui-pop, .ui-tooltip { z-index: 100; }
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--text) 45%, transparent);
+  animation: ui-fade var(--duration-enter) var(--ease-out);
+}
+.ui-overlay[data-state="closed"] { animation: ui-fade var(--duration-exit) var(--ease-in-out) reverse; }
+
+.ui-pop {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-1);
+  min-width: 10rem;
+  max-width: min(24rem, calc(100vw - 2 * var(--space-4)));
+  animation: ui-rise var(--duration-enter) var(--ease-out);
+  transform-origin: var(--radix-popper-transform-origin);
+}
+.ui-pop[data-state="closed"] { animation: ui-rise var(--duration-exit) var(--ease-in-out) reverse; }
+
+/* -- dialog ----------------------------------------------------------------- */
+.ui-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(34rem, calc(100vw - 2 * var(--space-4)));
+  height: fit-content;
+  max-height: calc(100dvh - 2 * var(--space-4));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  animation: ui-rise var(--duration-enter) var(--ease-out);
+}
+.ui-dialog--wide { width: min(48rem, calc(100vw - 2 * var(--space-4))); }
+/* Exits only run when the caller keeps `open` controlled and flips it; a
+   `{cond && <Dialog open>}` unmounts the root and cuts instead. Both are fine:
+   a cut is the right exit when another surface arrives in the same commit. */
+.ui-dialog[data-state="closed"] { animation: ui-rise var(--duration-exit) var(--ease-in-out) reverse; }
+.ui-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.ui-dialog-titles { flex: 1 1 auto; min-width: 0; }
+.ui-dialog-title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; text-wrap: balance; }
+.ui-dialog-sub { margin: 2px 0 0; font-size: .82rem; color: var(--muted); }
+/* The body scrolls; the header and the actions do not. */
+.ui-dialog-body { flex: 1 1 auto; overflow-y: auto; padding: var(--space-4) var(--space-5); }
+.ui-dialog-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+@media (max-width: 719.98px) {
+  /* On a phone the dialog takes the bottom of the screen: reachable by thumb. */
+  .ui-dialog, .ui-dialog--wide {
+    inset: auto 0 0 0;
+    margin: 0;
+    width: 100vw;
+    max-height: calc(100dvh - var(--space-5));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .ui-dialog-foot {
+    border-radius: 0;
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0));
+  }
+}
+
+/* -- sheet ------------------------------------------------------------------ */
+/* The trailing edge, full height, over the dimmed list. The same anatomy as
+   the dialog — head, scrolling body, fixed foot — in the other shape. */
+.ui-sheet {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: min(30rem, 100vw);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  animation: ui-slide var(--duration-fast) var(--ease-out);
+}
+.ui-sheet--start { inset-inline-end: auto; inset-inline-start: 0; animation-name: ui-slide-start; }
+.ui-sheet[data-state="closed"] { animation: ui-slide var(--duration-exit) var(--ease-in-out) reverse; }
+.ui-sheet--start[data-state="closed"] { animation-name: ui-slide-start; }
+.ui-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.ui-sheet-titles { flex: 1 1 auto; min-width: 0; }
+.ui-sheet-title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; text-wrap: balance; }
+.ui-sheet-sub { margin: 2px 0 0; font-size: .82rem; color: var(--muted); }
+/* The body scrolls; the header and the actions do not. Losing the actions
+   because the history is long is losing the reason the sheet was opened. */
+.ui-sheet-body { flex: 1 1 auto; overflow-y: auto; padding: var(--space-4) var(--space-5); }
+.ui-sheet-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0));
+}
+@media (max-width: 719.98px) {
+  /* On a phone there is no room for a list behind it, so it takes the screen:
+     the same component, in the other shape. */
+  .ui-sheet { width: 100vw; }
+}
+
+/* -- the close affordance, shared by dialog, sheet and toast ----------------- */
+.ui-close {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.ui-close:hover { border-color: var(--muted); }
+
+/* -- select ----------------------------------------------------------------- */
+.ui-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+  max-width: 100%;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.ui-select:hover { border-color: var(--muted); }
+.ui-select[data-placeholder] { color: var(--muted); }
+.ui-select[data-disabled] { opacity: .5; cursor: default; }
+.ui-select > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-icon { display: inline-flex; color: var(--muted); flex: 0 0 auto; }
+.ui-select-content { min-width: var(--radix-select-trigger-width); max-height: var(--radix-select-content-available-height); }
+.ui-select-viewport { padding: 0; }
+
+/* One row anatomy for options and menu items. */
+.ui-option, .ui-menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3) 0 var(--space-5);
+  border-radius: calc(var(--radius) - var(--space-1));
+  font-size: .95rem;
+  user-select: none;
+  outline: none;
+  cursor: pointer;
+}
+.ui-menu-item { padding-inline-start: var(--space-3); }
+/* 40px rows are dense-desktop size; a thumb gets the full 44px. */
+@media (pointer: coarse) {
+  .ui-option, .ui-menu-item { min-height: 44px; }
+}
+.ui-option[data-highlighted], .ui-menu-item[data-highlighted] {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--text);
+}
+.ui-option[data-disabled], .ui-menu-item[data-disabled] { color: var(--muted); cursor: default; }
+.ui-option-check {
+  position: absolute;
+  left: var(--space-2);
+  display: inline-flex;
+  color: var(--primary);
+}
+.ui-menu-item.is-danger { color: var(--danger-strong, var(--danger)); }
+.ui-menu-item.is-danger[data-highlighted] { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.ui-menu-sep { height: 1px; margin: var(--space-1) 0; background: var(--border); }
+.ui-menu-label { padding: var(--space-1) var(--space-3); font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+/* -- popover ---------------------------------------------------------------- */
+.ui-popover { padding: var(--space-4); }
+.ui-popover-title { margin: 0 0 var(--space-2); font-size: .95rem; font-weight: 600; }
+.ui-arrow { fill: var(--surface); }
+.ui-arrow-line { fill: var(--border); }
+
+/* -- tabs ------------------------------------------------------------------- */
+.ui-tabs-list {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ui-tab {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+.ui-tab:hover { color: var(--text); }
+.ui-tab[data-state="active"] { color: var(--primary); border-bottom-color: var(--primary); }
+.ui-tab-panel { padding-top: var(--space-4); outline: none; }
+
+/* -- tooltip ---------------------------------------------------------------- */
+.ui-tooltip {
+  padding: var(--space-1) var(--space-2);
+  border-radius: calc(var(--radius) - var(--space-1));
+  background: var(--bg-invert);
+  color: var(--text-invert);
+  font-size: .8rem;
+  line-height: 1.3;
+  max-width: 16rem;
+  box-shadow: var(--shadow);
+  animation: ui-fade var(--duration-fast) var(--ease-out);
+}
+.ui-tooltip-arrow { fill: var(--bg-invert); }
+
+/* -- toasts ----------------------------------------------------------------- */
+.ui-toasts {
+  position: fixed;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(24rem, 100vw);
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+  margin: 0;
+  list-style: none;
+  outline: none;
+}
+.ui-toast {
+  --ui-toast-tone: var(--primary);
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--ui-toast-tone);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  animation: ui-slide var(--duration-enter) var(--ease-out);
+}
+.ui-toast[data-tone="ok"] { --ui-toast-tone: var(--ok); }
+.ui-toast[data-tone="error"] { --ui-toast-tone: var(--danger); }
+.ui-toast[data-state="closed"] { animation: ui-fade var(--duration-exit) var(--ease-in-out) reverse; }
+.ui-toast[data-swipe="move"] { transform: translateX(var(--radix-toast-swipe-move-x)); }
+.ui-toast[data-swipe="cancel"] { transform: translateX(0); transition: transform var(--duration-fast) var(--ease-out); }
+.ui-toast[data-swipe="end"] { animation: ui-slide var(--duration-exit) var(--ease-in-out) reverse; }
+.ui-toast-title { grid-column: 1; margin: 0; font-weight: 600; font-size: .95rem; }
+.ui-toast-desc { grid-column: 1; margin: 0; font-size: .85rem; color: var(--muted); }
+.ui-toast .ui-close { grid-column: 2; grid-row: 1 / span 2; width: 32px; height: 32px; border: 0; background: none; color: var(--muted); position: relative; }
+/* Drawn at 32px so it does not compete with the text; hit at 44px for a thumb. */
+.ui-toast .ui-close::before { content: ''; position: absolute; inset: -6px; }
+.ui-toast .ui-close:hover { color: var(--text); }
+
+/* -- motion ----------------------------------------------------------------- */
+@keyframes ui-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-rise {
+  from { opacity: 0; transform: translateY(var(--space-2)) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ui-slide {
+  from { opacity: 0; transform: translateX(var(--space-5)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ui-slide-start {
+  from { opacity: 0; transform: translateX(calc(-1 * var(--space-5))); }
+  to { opacity: 1; transform: none; }
+}

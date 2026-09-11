@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { SidePanel } from '../components/kit/SidePanel';
+import { Dialog, Select, useToast } from '../components/ui';
 import { IconArrowLeft, IconArrowRight, IconoEmail, IconoTelefono, IconoWhatsApp } from '../components/kit/Icono';
 import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
 import {
@@ -22,7 +23,9 @@ export default function Kanban() {
   const [abierto, setAbierto] = useState<string | null>(null);
   const [historial, setHistorial] = useState<Actividad[]>([]);
   const [email, setEmail] = useState<{ lead: Lead; asunto: string; texto: string } | null>(null);
-  const [aviso, setAviso] = useState('');
+  // Feedback that belongs to no place on the board goes to a toast: it is
+  // announced, it leaves by itself, and it never pushes the columns down.
+  const toast = useToast();
   // Filtros en estado propio (no derivados de los datos): la recarga por SSE
   // reemplaza `leads` sin tocar lo que la agente tiene seleccionado/escrito.
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
@@ -104,7 +107,7 @@ export default function Kanban() {
     try {
       await anotar(l.id, texto);
     } catch {
-      setAviso(t('lead.notaError', { nombre: l.nombre }));
+      toast({ title: t('lead.notaError', { nombre: l.nombre }), tone: 'error' });
       return;
     }
     setNota((n) => ({ ...n, [l.id]: '' }));
@@ -114,48 +117,89 @@ export default function Kanban() {
     setHistorial(acts);
   };
 
+  // The compositor is a dialog: "answer this before continuing". One surface
+  // at a time: the record steps aside while the email is written and comes
+  // back — with the email in its history — when it is sent or dropped, so
+  // the agent lands on the proof of what just happened.
+  const redactar = (l: Lead) => {
+    abrir(null);
+    setEmail({
+      lead: l,
+      asunto: l.expand?.propiedad
+        ? t('email.asuntoPropiedad', { propiedad: l.expand.propiedad.titulo })
+        : t('email.asuntoGenerico'),
+      texto: t('email.plantilla', {
+        nombre: l.nombre,
+        propiedad: l.expand?.propiedad
+          ? t('email.plantillaPropiedad', { propiedad: l.expand.propiedad.titulo }) : '',
+      }),
+    });
+  };
+  const cerrarEmail = async () => {
+    if (!email) return;
+    const { lead } = email;
+    setEmail(null);
+    await abrirFicha(lead);
+  };
+  const [enviando, setEnviando] = useState(false);
   const mandarEmail = async () => {
     if (!email) return;
-    setAviso(t('email.enviando'));
+    setEnviando(true);
     try {
       await enviarEmail(email.lead, email.asunto, email.texto);
-      setAviso(t('email.enviado', { nombre: email.lead.nombre }));
-      setEmail(null);
+      toast({ title: t('email.enviado', { nombre: email.lead.nombre }), tone: 'ok' });
       recargar();
+      await cerrarEmail();
     } catch (err) {
-      setAviso(t('email.error', { error: (err as Error).message }));
+      toast({ title: t('email.error', { error: (err as Error).message }), tone: 'error' });
+    } finally {
+      setEnviando(false);
     }
   };
 
+  const opcionesPropiedad = propiedades.map((p) => ({ value: p.id, label: p.titulo }));
+
   return (
     <>
-      {aviso && <p role="status" className="aviso aviso-ok">{aviso}</p>}
-
       {email && (
-        <div className="compositor">
-          <h2>{t('email.titulo', { nombre: email.lead.nombre })} <span className="dest">&lt;{email.lead.email}&gt;</span></h2>
-          <label>{t('email.asunto')}
-            <input value={email.asunto} onChange={(e) => setEmail({ ...email, asunto: e.target.value })} />
+        <Dialog
+          open
+          onOpenChange={(open) => { if (!open && !enviando) cerrarEmail(); }}
+          title={t('email.titulo', { nombre: email.lead.nombre })}
+          description={email.lead.email}
+          footer={(
+            <>
+              <button className="kit-btn kit-btn-ghost" onClick={cerrarEmail} disabled={enviando}>{t('email.cancelar')}</button>
+              <button className="kit-btn kit-btn-primary" onClick={mandarEmail} disabled={enviando || !email.asunto || !email.texto}>
+                {enviando ? t('email.enviando') : t('email.enviar')}
+              </button>
+            </>
+          )}
+        >
+          <label className="campo">{t('email.asunto')}
+            <input value={email.asunto} autoFocus onChange={(e) => setEmail({ ...email, asunto: e.target.value })} />
           </label>
-          <label>{t('email.mensaje')}
-            <textarea rows={6} value={email.texto} onChange={(e) => setEmail({ ...email, texto: e.target.value })} />
+          <label className="campo">{t('email.mensaje')}
+            <textarea rows={8} value={email.texto} onChange={(e) => setEmail({ ...email, texto: e.target.value })} />
           </label>
-          <div className="botones">
-            <button className="primario" onClick={mandarEmail} disabled={!email.asunto || !email.texto}>{t('email.enviar')}</button>
-            <button onClick={() => setEmail(null)}>{t('email.cancelar')}</button>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       <div className="filtros">
         <button className="kit-btn kit-btn-primary" onClick={() => setNuevo({
           nombre: '', telefono: '', email: '', propiedad: filtroProp === 'sin' ? '' : filtroProp, mensaje: '',
         })}>+ {t('lead.nuevo')}</button>
-        <select value={filtroProp} onChange={(e) => setFiltroProp(e.target.value)} aria-label={t('filtros.propiedad')}>
-          <option value="">{t('filtros.todas')}</option>
-          <option value="sin">{t('filtros.sinPropiedad')}</option>
-          {propiedades.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)}
-        </select>
+        <Select
+          value={filtroProp}
+          onValueChange={setFiltroProp}
+          ariaLabel={t('filtros.propiedad')}
+          className="filtro-propiedad"
+          options={[
+            { value: '', label: t('filtros.todas') },
+            { value: 'sin', label: t('filtros.sinPropiedad') },
+            ...opcionesPropiedad,
+          ]}
+        />
         <input type="search" placeholder={t('filtros.buscar')} value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)} aria-label={t('filtros.buscarAria')} />
       </div>
@@ -247,7 +291,7 @@ export default function Kanban() {
                   // teléfono suele querer anotar algo más.
                   if (creado?.id) abrir(creado.id);
                 } catch (e) {
-                  setAviso(t('lead.nuevoError', { error: (e as Error).message }));
+                  toast({ title: t('lead.nuevoError', { error: (e as Error).message }), tone: 'error' });
                 } finally {
                   setGuardando(false);
                 }
@@ -269,13 +313,15 @@ export default function Kanban() {
             <input value={nuevo.email} type="email"
               onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })} />
           </label>
-          <label className="campo">{t('filtros.propiedad')}
-            <select value={nuevo.propiedad}
-              onChange={(e) => setNuevo({ ...nuevo, propiedad: e.target.value })}>
-              <option value="">{t('filtros.sinPropiedad')}</option>
-              {propiedades.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)}
-            </select>
-          </label>
+          <div className="campo">
+            <span>{t('filtros.propiedad')}</span>
+            <Select
+              value={nuevo.propiedad}
+              onValueChange={(v) => setNuevo({ ...nuevo, propiedad: v })}
+              ariaLabel={t('filtros.propiedad')}
+              options={[{ value: '', label: t('filtros.sinPropiedad') }, ...opcionesPropiedad]}
+            />
+          </div>
           <label className="campo">{t('lead.campo.mensaje')}
             <textarea rows={3} value={nuevo.mensaje}
               onChange={(e) => setNuevo({ ...nuevo, mensaje: e.target.value })} />
@@ -301,17 +347,9 @@ export default function Kanban() {
                   onClick={() => contactar(ficha, 'whatsapp')}><IconoWhatsApp /> WhatsApp</a>
               )}
               {ficha.email && (
-                <button className="kit-btn kit-btn-primary" onClick={() => setEmail({
-                  lead: ficha,
-                  asunto: ficha.expand?.propiedad
-                    ? t('email.asuntoPropiedad', { propiedad: ficha.expand.propiedad.titulo })
-                    : t('email.asuntoGenerico'),
-                  texto: t('email.plantilla', {
-                    nombre: ficha.nombre,
-                    propiedad: ficha.expand?.propiedad
-                      ? t('email.plantillaPropiedad', { propiedad: ficha.expand.propiedad.titulo }) : '',
-                  }),
-                })}><IconoEmail /> {t('email.enviar')}</button>
+                <button className="kit-btn kit-btn-primary" onClick={() => redactar(ficha)}>
+                  <IconoEmail /> {t('email.enviar')}
+                </button>
               )}
             </>
           )}

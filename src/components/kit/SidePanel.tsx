@@ -1,6 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { useI18n } from '../../lib/LocaleContext';
-import { IconClose } from './Icono';
+import type { ReactNode } from 'react';
+import { Sheet } from '../ui';
 
 // The ninth component: where a detail opens.
 //
@@ -11,11 +10,12 @@ import { IconClose } from './Icono';
 // "stop everything", and reading a lead is not an interruption of the work, it
 // IS the work.
 //
-// Built on <dialog> and `showModal()`, which is not decoration. It gives, for
-// free and correctly: a focus trap, Escape to close, the rest of the page made
-// inert to assistive technology, and the top layer so no z-index can ever land
-// above it. Hand-rolling a drawer means hand-rolling those four, and the fourth
-// one is the one everybody forgets.
+// It is the ui kit's Sheet, under the name the screens already use. Until
+// 2026-09-11 it was a native <dialog> opened with showModal(), which gave the
+// focus trap and Escape for free — and lived in the browser's top layer, where
+// nothing else can paint: the kit's Select opened inside it and the toasts
+// fired while it was open landed underneath, inert. One layering model for
+// every overlay is worth more than the free showModal().
 
 export function SidePanel({ open, onClose, title, subtitle, children, footer }: {
   open: boolean;
@@ -26,36 +26,11 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer }: 
   /** Actions. They sit in a bar that does not scroll away with the content. */
   footer?: ReactNode;
 }) {
-  const { t } = useI18n();
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
   return (
-    <dialog
-      ref={ref}
-      className="kit-panel"
-      // Escape and the backdrop both come back through here, so there is one
-      // way out and the caller's state cannot drift from the dialog's.
-      onClose={onClose}
-      onClick={(e) => { if (e.target === ref.current) onClose(); }}
-    >
-      <header className="kit-panel-head">
-        <div className="kit-panel-titles">
-          <h2>{title}</h2>
-          {subtitle && <p className="kit-panel-sub">{subtitle}</p>}
-        </div>
-        <button type="button" className="kit-panel-close" onClick={onClose} aria-label={t('panel.cerrar')}>
-          <IconClose size={20} />
-        </button>
-      </header>
-      <div className="kit-panel-body">{children}</div>
-      {footer && <footer className="kit-panel-foot">{footer}</footer>}
-    </dialog>
+    // Escape and the overlay both come back through `onOpenChange`, so there is
+    // one way out and the caller's state cannot drift from the sheet's.
+    <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }} title={title} description={subtitle} footer={footer}>
+      {children}
+    </Sheet>
   );
 }
