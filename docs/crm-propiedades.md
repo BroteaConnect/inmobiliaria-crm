@@ -177,6 +177,10 @@ not have.
   form element, and reaches it through `form="<id>"`.
 - **It cannot be closed while it is saving.** A panel that vanishes mid-save
   invites a second entry, and the first one lands seconds later.
+- **The primary is never disabled for a title that is still missing.** It was,
+  and that is what a user reports as "it will not let me save". Pressing Save
+  with an empty title lets `required` focus the box; a title of only spaces
+  (which `required` accepts) is refused with `prop.faltaTitulo` in the panel.
 - **Inputs are controlled**, held in one `PropertyFields` object of strings
   (`src/crm/property-form.ts`). The old form was uncontrolled
   (`defaultValue`) and depended on a `key` remount that included

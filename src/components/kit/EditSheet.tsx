@@ -22,13 +22,20 @@ import { SidePanel } from './SidePanel';
 //   · a failure is said INSIDE the panel (`error`, through the kit's Sheet).
 //     An open sheet hides the toasts from assistive technology, so a toast
 //     alone is feedback a screen-reader user never gets.
+//
+// The primary is NEVER disabled for an incomplete record, only while saving.
+// It used to grey out until the form was valid, and that is the bug a user
+// reports as "it will not let me save": a dead button explains nothing, and
+// the one field holding it back is the one they cannot see. A form that
+// cannot be saved yet says so when it is asked to save — through the
+// browser's own `required` (which focuses the field) or through `error`.
 
 // The form id only has to be unique in the document, and this app never
 // renders on a server, so a counter is enough and reads better than a hash.
 let seq = 0;
 
 export function EditSheet({
-  open, onClose, onSubmit, title, subtitle, error, busy = false, canSave = true,
+  open, onClose, onSubmit, title, subtitle, error, busy = false,
   saveLabel, busyLabel, cancelLabel, extraActions, children,
 }: {
   open: boolean;
@@ -41,8 +48,6 @@ export function EditSheet({
   error?: ReactNode;
   /** A save in flight: the panel locks and the primary says so. */
   busy?: boolean;
-  /** False while the record has not got enough to be saved. */
-  canSave?: boolean;
   saveLabel: string;
   busyLabel: string;
   cancelLabel: string;
@@ -64,7 +69,7 @@ export function EditSheet({
           <button type="button" className="kit-btn kit-btn-ghost" disabled={busy} onClick={onClose}>
             {cancelLabel}
           </button>
-          <button type="submit" form={formId} className="kit-btn kit-btn-primary" disabled={busy || !canSave}>
+          <button type="submit" form={formId} className="kit-btn kit-btn-primary" disabled={busy}>
             {busy ? busyLabel : saveLabel}
           </button>
         </>

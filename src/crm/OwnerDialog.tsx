@@ -38,7 +38,8 @@ export function OwnerDialog({ open, onClose, onCreated }: {
   const cerrar = () => { if (!guardando) { limpiar(); onClose(); } };
 
   const guardar = async () => {
-    if (guardando || !nombre.trim()) return;
+    if (guardando) return;
+    if (!nombre.trim()) { setError(t('propietario.faltaNombre')); return; }
     setGuardando(true);
     setError(null);
     try {
@@ -72,7 +73,7 @@ export function OwnerDialog({ open, onClose, onCreated }: {
           <button type="button" className="kit-btn kit-btn-ghost" disabled={guardando} onClick={cerrar}>
             {t('propietario.cancelar')}
           </button>
-          <button type="submit" form={formId} className="kit-btn kit-btn-primary" disabled={guardando || !nombre.trim()}>
+          <button type="submit" form={formId} className="kit-btn kit-btn-primary" disabled={guardando}>
             {guardando ? t('propietario.guardando') : t('propietario.crear')}
           </button>
         </>

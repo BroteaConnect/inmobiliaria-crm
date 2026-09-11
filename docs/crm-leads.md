@@ -204,8 +204,10 @@ curl -X POST "$PB/api/collections/actividades/records" \
 The `+ New` button opens an `EditSheet` (`src/components/kit/EditSheet.tsx`,
 the anatomy every form in this CRM shares since 2026-09-11) with name, phone, email,
 property (the ui kit's `Select`, preselected from the active property filter;
-`''` is `filtros.sinPropiedad`) and message. Create is enabled once a name
-and a phone or email are present; it calls
+`''` is `filtros.sinPropiedad`) and message. A lead needs a name and a way to
+be reached: pressing Create without them keeps the panel open and says which
+of the two is missing (`lead.faltaNombre`, `lead.faltaContacto`) rather than
+grey the button out. It calls
 `crearLead({ …, etapa: 'nuevo', origen: 'manual' })` and opens the new
 record with an empty history, then loads it. `origen: 'manual'` keeps phone
 and walk-in leads out of the "web" count in reports.

@@ -239,8 +239,13 @@ what applies here:
   (`src/components/kit/EditSheet.tsx`, since 2026-09-11). Fields in one column
   as `.campo`, one primary that saves and one ghost that gives up, Enter in
   any field saves, the panel refuses to close while it is saving, and the
-  failure is said inside it. The new-lead panel and the property form are the
-  two adopters; the next form (visits, in E4) inherits it rather than being a
+  failure is said inside it. **The primary is never disabled for an incomplete
+  record**, only while saving: a dead button explains nothing, and the field
+  holding it back is the one the agent cannot see. A form that cannot be saved
+  yet says so when it is asked to save, through the browser's own `required`
+  (which focuses the offending field) or through the panel's `error` for the
+  rules `required` cannot express, such as the lead's phone-or-email. The
+  new-lead panel and the property form are the two adopters; the next form (visits, in E4) inherits it rather than being a
   third anatomy. It is a `<form>` element in the body and a submit button in
   the footer joined by `form="<id>"`, which is the only way to keep the
   actions in a bar that does not scroll with the content.
