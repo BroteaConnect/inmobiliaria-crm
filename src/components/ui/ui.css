@@ -138,6 +138,18 @@
   .ui-sheet { width: 100vw; }
 }
 
+/* -- the failure of a modal's own action, said inside the modal ------------- */
+.ui-alert {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: var(--space-2) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger-strong, var(--danger));
+  font-size: .9rem;
+  font-weight: 600;
+}
+
 /* -- the close affordance, shared by dialog, sheet and toast ----------------- */
 .ui-close {
   flex: 0 0 auto;

@@ -28,6 +28,10 @@ export default function Propiedades() {
   // the list on every render, so publishing or editing it updates the panel
   // without a second copy that can disagree.
   const [fichaId, setFichaId] = useState<string | null>(null);
+  // A failed publish is said inside the open panel too: the panel hides the
+  // toast from assistive technology. Cleared when another record opens.
+  const [fichaError, setFichaError] = useState<string | null>(null);
+  useEffect(() => { setFichaError(null); }, [fichaId]);
 
   // Buscar y paginar salen del brick `list`: la guarda de respuestas
   // desordenadas, el rebote del teclado y el recorte de la página vivían aquí
@@ -79,7 +83,9 @@ export default function Propiedades() {
       await actualizarPropiedad(p.id, { estado: p.estado === 'publicada' ? 'borrador' : 'publicada' });
       recargar();
     } catch (err) {
-      avisar('error', t('prop.errorEstado', { error: (err as Error).message }));
+      const msg = t('prop.errorEstado', { error: (err as Error).message });
+      setFichaError(msg);
+      avisar('error', msg);
     }
   };
 
@@ -296,6 +302,7 @@ export default function Propiedades() {
           onClose={() => setFichaId(null)}
           title={ficha.titulo}
           subtitle={metaDe(ficha)}
+          error={fichaError}
           footer={(
             <>
               {(ficha.estado === 'borrador' || ficha.estado === 'publicada') && (

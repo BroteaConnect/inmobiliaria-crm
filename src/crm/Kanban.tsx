@@ -26,6 +26,11 @@ export default function Kanban() {
   // Feedback that belongs to no place on the board goes to a toast: it is
   // announced, it leaves by itself, and it never pushes the columns down.
   const toast = useToast();
+  // A failure of a modal's own action is also said inside the modal: an open
+  // sheet or dialog hides the toasts from assistive technology.
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [nuevoError, setNuevoError] = useState<string | null>(null);
+  const [fichaError, setFichaError] = useState<string | null>(null);
   // Filtros en estado propio (no derivados de los datos): la recarga por SSE
   // reemplaza `leads` sin tocar lo que la agente tiene seleccionado/escrito.
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
@@ -57,7 +62,7 @@ export default function Kanban() {
   // Ref del lead abierto: descarta respuestas de cargas que llegan tarde,
   // para que el panel nunca muestre el historial de otro lead.
   const abiertoRef = useRef<string | null>(null);
-  const abrir = (id: string | null) => { abiertoRef.current = id; setAbierto(id); };
+  const abrir = (id: string | null) => { abiertoRef.current = id; setAbierto(id); setFichaError(null); };
   const cargarHistorial = async (id: string) => {
     const acts = await loadActividades(id).catch(() => []);
     if (abiertoRef.current === id) setHistorial(acts);
@@ -107,9 +112,12 @@ export default function Kanban() {
     try {
       await anotar(l.id, texto);
     } catch {
-      toast({ title: t('lead.notaError', { nombre: l.nombre }), tone: 'error' });
+      const msg = t('lead.notaError', { nombre: l.nombre });
+      setFichaError(msg);
+      toast({ title: msg, tone: 'error' });
       return;
     }
+    setFichaError(null);
     setNota((n) => ({ ...n, [l.id]: '' }));
     // Cargamos antes de abrir para no enseñar el historial de otro lead.
     const acts = await loadActividades(l.id).catch(() => []);
@@ -145,13 +153,16 @@ export default function Kanban() {
   const mandarEmail = async () => {
     if (!email) return;
     setEnviando(true);
+    setEmailError(null);
     try {
       await enviarEmail(email.lead, email.asunto, email.texto);
       toast({ title: t('email.enviado', { nombre: email.lead.nombre }), tone: 'ok' });
       recargar();
       await cerrarEmail();
     } catch (err) {
-      toast({ title: t('email.error', { error: (err as Error).message }), tone: 'error' });
+      const msg = t('email.error', { error: (err as Error).message });
+      setEmailError(msg);
+      toast({ title: msg, tone: 'error' });
     } finally {
       setEnviando(false);
     }
@@ -167,6 +178,7 @@ export default function Kanban() {
           onOpenChange={(open) => { if (!open && !enviando) cerrarEmail(); }}
           title={t('email.titulo', { nombre: email.lead.nombre })}
           description={email.lead.email}
+          error={emailError}
           footer={(
             <>
               <button className="kit-btn kit-btn-ghost" onClick={cerrarEmail} disabled={enviando}>{t('email.cancelar')}</button>
@@ -267,15 +279,19 @@ export default function Kanban() {
       {nuevo && (
         <SidePanel
           open
-          onClose={() => setNuevo(null)}
+          // Not while the create is in flight: a panel that vanishes mid-save
+          // invites a second entry, and the first one pops open on its own later.
+          onClose={() => { if (!guardando) setNuevo(null); }}
           title={t('lead.nuevoTitulo')}
           subtitle={t('lead.nuevoAyuda')}
+          error={nuevoError}
           footer={(
             <button
               className="kit-btn kit-btn-primary"
               disabled={guardando || !nuevo.nombre.trim() || !(nuevo.telefono.trim() || nuevo.email.trim())}
               onClick={async () => {
                 setGuardando(true);
+                setNuevoError(null);
                 try {
                   // `origen: 'manual'` distingue lo que entra por teléfono de lo
                   // que entra por la web: sin eso, el informe de procedencia
@@ -288,10 +304,17 @@ export default function Kanban() {
                   setNuevo(null);
                   recargar();
                   // Se abre la ficha recién creada: quien acaba de colgar el
-                  // teléfono suele querer anotar algo más.
-                  if (creado?.id) abrir(creado.id);
+                  // teléfono suele querer anotar algo más. Con su historial
+                  // (vacío) y no con el del último lead abierto.
+                  if (creado?.id) {
+                    setHistorial([]);
+                    abrir(creado.id);
+                    cargarHistorial(creado.id);
+                  }
                 } catch (e) {
-                  toast({ title: t('lead.nuevoError', { error: (e as Error).message }), tone: 'error' });
+                  const msg = t('lead.nuevoError', { error: (e as Error).message });
+                  setNuevoError(msg);
+                  toast({ title: msg, tone: 'error' });
                 } finally {
                   setGuardando(false);
                 }
@@ -336,6 +359,7 @@ export default function Kanban() {
           onClose={() => abrir(null)}
           title={ficha.nombre}
           subtitle={ficha.expand?.propiedad?.titulo ?? t('filtros.sinPropiedad')}
+          error={fichaError}
           footer={(
             <>
               {ficha.telefono && (

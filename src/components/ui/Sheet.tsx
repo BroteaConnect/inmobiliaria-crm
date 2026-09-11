@@ -15,7 +15,7 @@ import './ui.css';
 // inside it, or a toast fired while it was open, landed underneath, inert.
 // One layering model for every overlay is the whole reason this exists.
 
-export function Sheet({ open, onOpenChange, title, description, children, footer, side = 'end' }: {
+export function Sheet({ open, onOpenChange, title, description, children, footer, error, side = 'end' }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
@@ -24,6 +24,12 @@ export function Sheet({ open, onOpenChange, title, description, children, footer
   children: ReactNode;
   /** Actions, in a bar that does not scroll away with the content. */
   footer?: ReactNode;
+  /**
+   * What went wrong with the sheet's own action, said inside the sheet: a
+   * modal hides the rest of the page from assistive technology, toasts
+   * included, so a failure here is announced where the focus is.
+   */
+  error?: ReactNode;
   side?: 'end' | 'start';
 }) {
   const { t } = useI18n();
@@ -43,6 +49,7 @@ export function Sheet({ open, onOpenChange, title, description, children, footer
             <Rx.Close className="ui-close" aria-label={t('ui.close')}><IconClose /></Rx.Close>
           </header>
           <div className="ui-sheet-body">{children}</div>
+          {error && <p role="alert" className="ui-alert">{error}</p>}
           {footer && <footer className="ui-sheet-foot">{footer}</footer>}
         </Rx.Content>
       </Rx.Portal>

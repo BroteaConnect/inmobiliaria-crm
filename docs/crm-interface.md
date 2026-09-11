@@ -234,6 +234,13 @@ what applies here:
   is one. It closes the record while the email is written and reopens it,
   history reloaded, when it is sent or dropped, so the agent lands on the
   proof of what happened.
+- **A modal's own failure is said inside the modal.** An open sheet or dialog
+  hides the rest of the page, toasts included, from assistive technology. So
+  the compositor, the new-lead panel and both record panels pass `error` to
+  the kit (`role="alert"` above the footer) from their action's `catch`: a
+  failed send, a failed create, a failed note, a failed publish. The toast
+  stays for the sighted path; the panel is the announced one. The new-lead
+  panel also refuses to close while the create is in flight.
 - **Toasts replace and dismiss by id.** The property search error carries
   `id: 'prop-search'` (one toast while typing against a failing API, replaced
   in place); "preparing photos" carries `id: 'prop-fotos'` and is dismissed in

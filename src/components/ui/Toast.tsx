@@ -27,7 +27,7 @@ export type ToastInput = {
   /** A stable id replaces the toast that carries it instead of adding one. */
   id?: string;
 };
-type Item = Omit<ToastInput, 'id'> & { id: string; open: boolean };
+type Item = Omit<ToastInput, 'id'> & { id: string; open: boolean; rev: number };
 
 export type Toast = ((toast: ToastInput) => string) & { dismiss: (id: string) => void };
 
@@ -41,18 +41,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const [items, setItems] = useState<Item[]>([]);
   const seq = useRef(0);
+  // One removal timer per id. A toast re-issued while its predecessor is
+  // leaving cancels that removal, or the new one would be torn down mid-life.
+  const removals = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   // Closing flips `open` so the exit animation runs; the row is dropped from
   // state a moment later, whatever the animation did (reduced motion included).
   const dismiss = useCallback((id: string) => {
     setItems((list) => list.map((i) => (i.id === id ? { ...i, open: false } : i)));
-    setTimeout(() => setItems((list) => list.filter((i) => i.id !== id)), 1000);
+    clearTimeout(removals.current.get(id));
+    removals.current.set(id, setTimeout(() => {
+      removals.current.delete(id);
+      setItems((list) => list.filter((i) => i.id !== id));
+    }, 1000));
   }, []);
   const toast = useMemo<Toast>(() => Object.assign((input: ToastInput) => {
     const id = input.id ?? `t${++seq.current}`;
+    clearTimeout(removals.current.get(id));
+    removals.current.delete(id);
     setItems((list) => {
-      const next: Item = { ...input, id, open: true };
-      return list.some((i) => i.id === id) ? list.map((i) => (i.id === id ? next : i)) : [...list, next];
+      const prev = list.find((i) => i.id === id);
+      // A new revision remounts the root, so a replacement restarts its countdown.
+      const next: Item = { ...input, id, open: true, rev: (prev?.rev ?? 0) + 1 };
+      return prev ? list.map((i) => (i.id === id ? next : i)) : [...list, next];
     });
     return id;
   }, { dismiss }), [dismiss]);
@@ -63,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {children}
         {items.map((i) => (
           <Rx.Root
-            key={i.id}
+            key={`${i.id}-${i.rev}`}
             className="ui-toast"
             data-tone={i.tone ?? 'info'}
             open={i.open}

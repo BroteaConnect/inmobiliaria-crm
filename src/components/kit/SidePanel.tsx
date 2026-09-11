@@ -17,7 +17,7 @@ import { Sheet } from '../ui';
 // fired while it was open landed underneath, inert. One layering model for
 // every overlay is worth more than the free showModal().
 
-export function SidePanel({ open, onClose, title, subtitle, children, footer }: {
+export function SidePanel({ open, onClose, title, subtitle, children, footer, error }: {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -25,11 +25,14 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer }: 
   children: ReactNode;
   /** Actions. They sit in a bar that does not scroll away with the content. */
   footer?: ReactNode;
+  /** The failure of one of those actions, said inside the panel (role="alert"):
+   *  an open panel hides the toasts from assistive technology. */
+  error?: ReactNode;
 }) {
   return (
     // Escape and the overlay both come back through `onOpenChange`, so there is
     // one way out and the caller's state cannot drift from the sheet's.
-    <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }} title={title} description={subtitle} footer={footer}>
+    <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }} title={title} description={subtitle} footer={footer} error={error}>
       {children}
     </Sheet>
   );
