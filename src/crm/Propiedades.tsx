@@ -88,7 +88,11 @@ export default function Propiedades() {
   }, [remoto.error, t, toast]);
 
   const cerrarPanel = () => { setPanel(null); setPanelError(null); setFresco(null); };
-  const verFicha = (id: string) => { setPanel({ modo: 'ficha', id }); setPanelError(null); };
+  // Opening seeds `fresco` with the record that was clicked, so the panel never
+  // depends on the list staying still underneath it: a search answer landing
+  // while a record is open used to be able to drop that row and close the
+  // panel with no explanation.
+  const verFicha = (p: Propiedad) => { setFresco(p); setPanel({ modo: 'ficha', id: p.id }); setPanelError(null); };
   const editar = (p: Propiedad) => {
     setCampos(fieldsOf(p));
     setPanelError(null);
@@ -105,16 +109,27 @@ export default function Propiedades() {
 
   // -- the record's own decisions, taken while reading it ----------------------
 
+  // One write at a time on the open record. Without it, pressing a status
+  // button on a slow link looks like nothing happened, the agent presses
+  // again, and two PATCHes race: whichever answers last wins the panel, which
+  // can be the older one. The photo handlers already worked this way.
+  const [escribiendo, setEscribiendo] = useState(false);
+  const ocupado = escribiendo || subiendo || borrando !== null;
+
   const cambiarEstado = async (p: Propiedad, estado: EstadoPropiedad) => {
-    if (p.estado === estado) return;
+    if (p.estado === estado || ocupado) return;
+    setEscribiendo(true);
     try {
       setFresco(await actualizarPropiedad(p.id, { estado }));
       setPanelError(null);
       recargar();
+      avisar('ok', t('prop.estadoCambiado', { estado: t(`estadoProp.${estado}`) }));
     } catch (err) {
       const msg = t('prop.errorEstado', { error: (err as Error).message });
       setPanelError(msg);
       avisar('error', msg);
+    } finally {
+      setEscribiendo(false);
     }
   };
 
@@ -125,8 +140,10 @@ export default function Propiedades() {
     setPrecioAbierto(true);
   };
   const guardarPrecio = async (p: Propiedad) => {
+    if (ocupado) return;
     const raw = precioValor.trim();
     const n = Number(raw);
+    setEscribiendo(true);
     try {
       setFresco(await actualizarPropiedad(p.id, { precio: raw === '' || Number.isNaN(n) ? null : n }));
       setPrecioAbierto(false);
@@ -136,6 +153,8 @@ export default function Propiedades() {
       const msg = t('prop.errorGuardar', { error: (err as Error).message });
       setPanelError(msg);
       avisar('error', msg);
+    } finally {
+      setEscribiendo(false);
     }
   };
 
@@ -143,12 +162,12 @@ export default function Propiedades() {
   // while looking at the property, which is also why saving is plain JSON now
   // and the multipart-with-fields path is gone.
   const subirFotos = async (p: Propiedad, elegidas: File[]) => {
-    if (!elegidas.length || subiendo || borrando) return;
+    if (!elegidas.length || ocupado) return;
     setSubiendo(true);
     // Progress, gone the moment the outcome arrives (see `finally`).
     toast({ id: 'prop-fotos', title: t('prop.preparandoFotos') });
     try {
-      const fotos = await Promise.all(elegidas.map(normalizaFoto));
+      const fotos = await Promise.all(elegidas.map((f) => normalizaFoto(f, locale)));
       const fd = new FormData();
       // 'fotos+' APPENDS (PocketBase syntax); a plain 'fotos' in a PATCH would
       // replace the whole set and delete the files already there.
@@ -170,7 +189,7 @@ export default function Propiedades() {
   // Borrar una foto es un PATCH inmediato ('fotos-') e irreversible: PocketBase
   // elimina el fichero del disco, de ahí el confirm.
   const borrarFoto = async (p: Propiedad, nombre: string) => {
-    if (borrando || subiendo) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
+    if (ocupado) return; // un borrado a la vez: dos PATCH concurrentes pueden llegar desordenados
     if (!confirm(t('prop.confirmarFoto'))) return;
     setBorrando(nombre);
     try {
@@ -191,7 +210,13 @@ export default function Propiedades() {
   const guardar = async () => {
     if (enviando || !panel || panel.modo === 'ficha') return;
     const editando = panel.modo === 'editar' ? ficha : null;
-    if (panel.modo === 'editar' && !editando) return; // the record went away under us
+    if (panel.modo === 'editar' && !editando) {
+      // The record went away under the form. Saying nothing would leave the
+      // agent pressing an enabled button at a silent app.
+      avisar('error', t('prop.errorDesaparecida'));
+      cerrarPanel();
+      return;
+    }
     setEnviando(true);
     setPanelError(null);
     const payload = payloadOf(campos, !!editando);
@@ -261,7 +286,7 @@ export default function Propiedades() {
             {/* One way in, like every other list in this CRM. Publishing and
                 editing are decisions about a property, and you take them
                 looking at the property — not from a grid tile. */}
-            <button className="cuerpo" onClick={() => verFicha(p.id)}>
+            <button className="cuerpo" onClick={() => verFicha(p)}>
               <strong>{p.titulo}</strong>
               <span className="meta">{metaDe(p)}</span>
               <span className="precio">{fmtPrecio(locale, p.precio, moneda)}</span>
@@ -295,8 +320,21 @@ export default function Propiedades() {
             onOpenChange={(o) => (o ? abrirPrecio(ficha) : setPrecioAbierto(false))}
             title={t('prop.campo.precio')}
             trigger={(
-              <button type="button" className="ficha-precio" aria-label={t('prop.precioEditar')}>
-                {fmtPrecio(locale, ficha.precio, moneda)}
+              // With no price the headline number would be a lonely dash: it
+              // says the right thing on a card, in a column of cards, and
+              // nothing at all where it is also the way to set one.
+              <button
+                type="button"
+                className={ficha.precio ? 'ficha-precio' : 'ficha-precio vacio'}
+                // `aria-label` REPLACES the content for assistive technology,
+                // so a bare "edit the price" made the price itself unreadable
+                // — it appears nowhere else in the panel — and left the empty
+                // state saying one thing and announcing another.
+                aria-label={t('prop.precioEditarValor', {
+                  precio: ficha.precio ? fmtPrecio(locale, ficha.precio, moneda) : t('prop.sinPrecio'),
+                })}
+              >
+                {ficha.precio ? fmtPrecio(locale, ficha.precio, moneda) : t('prop.sinPrecio')}
               </button>
             )}
           >
@@ -323,6 +361,7 @@ export default function Propiedades() {
                 type="button"
                 className={`estado-btn estado-${e}${ficha.estado === e ? ' activa' : ''}`}
                 aria-pressed={ficha.estado === e}
+                disabled={ocupado}
                 onClick={() => cambiarEstado(ficha, e)}
               >
                 {t(`estadoProp.${e}`)}
@@ -349,7 +388,7 @@ export default function Propiedades() {
                     <button
                       type="button"
                       className="quitar-foto"
-                      disabled={subiendo || borrando !== null}
+                      disabled={ocupado}
                       aria-label={t('prop.eliminarFoto', { n: i + 1 })}
                       onClick={() => borrarFoto(ficha, nombre)}
                     ><IconClose /></button>
@@ -360,7 +399,7 @@ export default function Propiedades() {
           )}
           <label className="campo">{subiendo ? t('prop.fotosSubiendo') : t('prop.fotosAnadir')}
             <input
-              type="file" accept="image/*" multiple disabled={subiendo || borrando !== null}
+              type="file" accept="image/*" multiple disabled={ocupado}
               onChange={(e) => {
                 const elegidas = Array.from(e.target.files ?? []);
                 e.target.value = ''; // so the same file can be picked again after a failure
@@ -376,7 +415,7 @@ export default function Propiedades() {
       {enFormulario && (
         <EditSheet
           open
-          onClose={() => (editando && ficha ? verFicha(ficha.id) : cerrarPanel())}
+          onClose={() => (editando && ficha ? verFicha(ficha) : cerrarPanel())}
           onSubmit={guardar}
           title={editando && ficha ? t('prop.editarTitulo', { titulo: ficha.titulo }) : t('prop.nuevaTitulo')}
           subtitle={editando ? undefined : t('prop.nuevaAyuda')}
