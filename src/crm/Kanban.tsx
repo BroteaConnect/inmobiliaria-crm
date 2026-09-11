@@ -288,11 +288,15 @@ export default function Kanban() {
           subtitle={t('lead.nuevoAyuda')}
           error={nuevoError}
           busy={guardando}
-          canSave={!!nuevo.nombre.trim() && !!(nuevo.telefono.trim() || nuevo.email.trim())}
           saveLabel={t('lead.crear')}
           busyLabel={t('lead.guardando')}
           cancelLabel={t('email.cancelar')}
           onSubmit={async () => {
+            // A lead needs a name, and a way to be reached. The second rule is
+            // one `required` cannot express, so it is said here rather than
+            // left to a button that greys out for reasons of its own.
+            if (!nuevo.nombre.trim()) { setNuevoError(t('lead.faltaNombre')); return; }
+            if (!nuevo.telefono.trim() && !nuevo.email.trim()) { setNuevoError(t('lead.faltaContacto')); return; }
             setGuardando(true);
             setNuevoError(null);
             try {
@@ -324,7 +328,7 @@ export default function Kanban() {
           }}
         >
           <label className="campo">{t('lead.campo.nombre')}
-            <input value={nuevo.nombre} autoFocus
+            <input value={nuevo.nombre} autoFocus required
               onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
           </label>
           <label className="campo">{t('lead.campo.telefono')}

@@ -209,6 +209,13 @@ export default function Propiedades() {
 
   const guardar = async () => {
     if (enviando || !panel || panel.modo === 'ficha') return;
+    // `required` on the title catches an empty box and focuses it, but it
+    // accepts a box full of spaces; this catches that and says so where the
+    // browser cannot.
+    if (!canSave(campos)) {
+      setPanelError(t('prop.faltaTitulo'));
+      return;
+    }
     const editando = panel.modo === 'editar' ? ficha : null;
     if (panel.modo === 'editar' && !editando) {
       // The record went away under the form. Saying nothing would leave the
@@ -421,7 +428,6 @@ export default function Propiedades() {
           subtitle={editando ? undefined : t('prop.nuevaAyuda')}
           error={panelError}
           busy={enviando}
-          canSave={canSave(campos)}
           saveLabel={t('prop.guardar')}
           busyLabel={t('prop.guardando')}
           cancelLabel={t('prop.cancelar')}
