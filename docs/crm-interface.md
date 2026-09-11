@@ -235,6 +235,19 @@ not import a component library for it. The brick's `wire.md` (platform repo,
 shadcn brings Tailwind and CSS the E2 gate counts as debt — and the rules;
 what applies here:
 
+- **Every form in the CRM is an `EditSheet`**
+  (`src/components/kit/EditSheet.tsx`, since 2026-09-11). Fields in one column
+  as `.campo`, one primary that saves and one ghost that gives up, Enter in
+  any field saves, the panel refuses to close while it is saving, and the
+  failure is said inside it. The new-lead panel and the property form are the
+  two adopters; the next form (visits, in E4) inherits it rather than being a
+  third anatomy. It is a `<form>` element in the body and a submit button in
+  the footer joined by `form="<id>"`, which is the only way to keep the
+  actions in a bar that does not scroll with the content.
+- **A single value is edited where it is read, not in a form.** A property's
+  status is a group of buttons on the record and its price a `Popover` on the
+  price itself, the same way a lead's priority and stage are. A form is for
+  the fields you fill together.
 - **A dialog stops the work; the side panel is the work.** Reading a record
   beside the board is `SidePanel`, which since the ui kit is the kit's `Sheet`
   under the name the screens already use. It was a native `<dialog>` with

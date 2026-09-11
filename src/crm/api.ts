@@ -5,16 +5,25 @@ import { list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
 // La moneda es un dato del negocio (`negocio.moneda` en Ajustes), no una
 // constante: quien pinta el precio la pasa. Intl decide el formato por idioma
 // ("1.234.567 AED" en es, "AED 1,234,567" en en).
+// A property with no price is a property whose price nobody has set yet, and
+// PocketBase answers 0 for a number field that was never written: printing
+// "AED 0" on the card of every imported flat was the app saying it is free.
 export const fmtPrecio = (locale: string, n: number, moneda: string) =>
-  (n != null && Number.isFinite(n) ? fmtMoney(locale, n, moneda) : '—');
+  (n != null && Number.isFinite(n) && n !== 0 ? fmtMoney(locale, n, moneda) : '—');
 
 export const ETAPAS = ['nuevo', 'contactado', 'visita', 'oferta', 'reservado', 'vendido', 'nutriendo'] as const;
 export type Etapa = (typeof ETAPAS)[number];
 
+// The four states of a property, in the order they happen. They are the
+// publish control: the record's status group sets any of them, which a
+// two-way "publish / unpublish" toggle could never do.
+export const ESTADOS_PROPIEDAD = ['borrador', 'publicada', 'reservada', 'vendida'] as const;
+export type EstadoPropiedad = (typeof ESTADOS_PROPIEDAD)[number];
+
 export interface Propiedad {
   id: string; collectionId: string; titulo: string; direccion: string; municipio: string;
   precio: number; habitaciones: number; banos: number; superficie: number;
-  descripcion: string; estado: 'borrador' | 'publicada' | 'reservada' | 'vendida';
+  descripcion: string; estado: EstadoPropiedad;
   fotos: string[]; propietario: string;
 }
 

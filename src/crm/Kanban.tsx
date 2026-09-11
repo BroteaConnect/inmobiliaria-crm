@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { SidePanel } from '../components/kit/SidePanel';
+import { EditSheet } from '../components/kit/EditSheet';
 import { Dialog, Select, useToast } from '../components/ui';
 import { IconArrowLeft, IconArrowRight, IconoEmail, IconoTelefono, IconoWhatsApp } from '../components/kit/Icono';
 import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
@@ -277,52 +278,50 @@ export default function Kanban() {
       </div>
 
       {nuevo && (
-        <SidePanel
+        <EditSheet
           open
-          // Not while the create is in flight: a panel that vanishes mid-save
-          // invites a second entry, and the first one pops open on its own later.
-          onClose={() => { if (!guardando) setNuevo(null); }}
+          // EditSheet refuses to close while it is saving: a panel that vanishes
+          // mid-save invites a second entry, and the first one pops open on its
+          // own later. Enter in any field saves, as in every form of the CRM.
+          onClose={() => setNuevo(null)}
           title={t('lead.nuevoTitulo')}
           subtitle={t('lead.nuevoAyuda')}
           error={nuevoError}
-          footer={(
-            <button
-              className="kit-btn kit-btn-primary"
-              disabled={guardando || !nuevo.nombre.trim() || !(nuevo.telefono.trim() || nuevo.email.trim())}
-              onClick={async () => {
-                setGuardando(true);
-                setNuevoError(null);
-                try {
-                  // `origen: 'manual'` distingue lo que entra por teléfono de lo
-                  // que entra por la web: sin eso, el informe de procedencia
-                  // cuenta como web algo que nunca pasó por ella.
-                  const creado = await crearLead({
-                    nombre: nuevo.nombre.trim(), telefono: nuevo.telefono.trim(),
-                    email: nuevo.email.trim(), mensaje: nuevo.mensaje.trim(),
-                    propiedad: nuevo.propiedad || undefined, etapa: 'nuevo', origen: 'manual',
-                  });
-                  setNuevo(null);
-                  recargar();
-                  // Se abre la ficha recién creada: quien acaba de colgar el
-                  // teléfono suele querer anotar algo más. Con su historial
-                  // (vacío) y no con el del último lead abierto.
-                  if (creado?.id) {
-                    setHistorial([]);
-                    abrir(creado.id);
-                    cargarHistorial(creado.id);
-                  }
-                } catch (e) {
-                  const msg = t('lead.nuevoError', { error: (e as Error).message });
-                  setNuevoError(msg);
-                  toast({ title: msg, tone: 'error' });
-                } finally {
-                  setGuardando(false);
-                }
-              }}
-            >
-              {guardando ? t('lead.guardando') : t('lead.crear')}
-            </button>
-          )}
+          busy={guardando}
+          canSave={!!nuevo.nombre.trim() && !!(nuevo.telefono.trim() || nuevo.email.trim())}
+          saveLabel={t('lead.crear')}
+          busyLabel={t('lead.guardando')}
+          cancelLabel={t('email.cancelar')}
+          onSubmit={async () => {
+            setGuardando(true);
+            setNuevoError(null);
+            try {
+              // `origen: 'manual'` distingue lo que entra por teléfono de lo
+              // que entra por la web: sin eso, el informe de procedencia
+              // cuenta como web algo que nunca pasó por ella.
+              const creado = await crearLead({
+                nombre: nuevo.nombre.trim(), telefono: nuevo.telefono.trim(),
+                email: nuevo.email.trim(), mensaje: nuevo.mensaje.trim(),
+                propiedad: nuevo.propiedad || undefined, etapa: 'nuevo', origen: 'manual',
+              });
+              setNuevo(null);
+              recargar();
+              // Se abre la ficha recién creada: quien acaba de colgar el
+              // teléfono suele querer anotar algo más. Con su historial
+              // (vacío) y no con el del último lead abierto.
+              if (creado?.id) {
+                setHistorial([]);
+                abrir(creado.id);
+                cargarHistorial(creado.id);
+              }
+            } catch (e) {
+              const msg = t('lead.nuevoError', { error: (e as Error).message });
+              setNuevoError(msg);
+              toast({ title: msg, tone: 'error' });
+            } finally {
+              setGuardando(false);
+            }
+          }}
         >
           <label className="campo">{t('lead.campo.nombre')}
             <input value={nuevo.nombre} autoFocus
@@ -349,7 +348,7 @@ export default function Kanban() {
             <textarea rows={3} value={nuevo.mensaje}
               onChange={(e) => setNuevo({ ...nuevo, mensaje: e.target.value })} />
           </label>
-        </SidePanel>
+        </EditSheet>
       )}
 
       {/* The record, beside the board rather than instead of it. */}
