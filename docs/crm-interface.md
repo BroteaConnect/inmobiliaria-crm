@@ -5,8 +5,8 @@ what `src/crm/crm.css`, `src/components/kit/kit.css`, `src/styles/base.css`,
 `src/components/kit/Icono.tsx` and the ui kit (`src/components/ui/`) already
 do; a new screen inherits them
 rather than inventing its own. Screen-specific behaviour lives in
-[docs/crm-leads.md](crm-leads.md) and
-[docs/crm-propiedades.md](crm-propiedades.md).
+[docs/crm-leads.md](crm-leads.md), [docs/crm-propiedades.md](crm-propiedades.md)
+and [docs/crm-visitas.md](crm-visitas.md).
 
 ## Why this page exists
 
@@ -245,10 +245,23 @@ what applies here:
   yet says so when it is asked to save, through the browser's own `required`
   (which focuses the offending field) or through the panel's `error` for the
   rules `required` cannot express, such as the lead's phone-or-email. The
-  new-lead panel and the property form are the two adopters; the next form (visits, in E4) inherits it rather than being a
-  third anatomy. It is a `<form>` element in the body and a submit button in
-  the footer joined by `form="<id>"`, which is the only way to keep the
-  actions in a bar that does not scroll with the content.
+  new-lead panel and the property form are the two adopters. It is a `<form>`
+  element in the body and a submit button in the footer joined by
+  `form="<id>"`, which is the only way to keep the actions in a bar that does
+  not scroll with the content.
+
+  **The one exception is the visit form** (`src/crm/VisitaDialog.tsx`, E4,
+  2026-09-23), which is the kit's `Dialog`. It opens from the lead's record,
+  and the record is already a sheet: a second sheet sliding over the first
+  would leave two panels and no board. It follows the compositor's precedent
+  instead (the record steps aside, the question is answered in the middle,
+  the record comes back with the answer in it) and keeps every other rule of
+  the form anatomy: `.campo` fields in one column, a real `<form>` joined to
+  the footer's primary by `form="visita-form"`, Enter saves, the dialog will
+  not close while saving, the primary is only disabled while saving, and the
+  two rules `required` cannot express (a chosen lead, a wall clock that
+  exists) are said in the dialog's `error`. See
+  [docs/crm-visitas.md](crm-visitas.md).
 - **A single value is edited where it is read, not in a form.** A property's
   status is a group of buttons on the record and its price a `Popover` on the
   price itself, the same way a lead's priority and stage are. A form is for
@@ -261,14 +274,15 @@ what applies here:
   panel and the toasts fired with a record open rendered underneath, inert.
   One layering model for every overlay is the rule now (the brick's `wire.md`).
   "Answer this before continuing" is the kit's `Dialog`: the email compositor
-  is one. It closes the record while the email is written and reopens it,
-  history reloaded, when it is sent or dropped, so the agent lands on the
-  proof of what happened.
+  is one, and so is the visit form. Both close the record while the question
+  is answered and reopen it, history and visits reloaded, when it is sent,
+  booked or dropped, so the agent lands on the proof of what happened.
 - **A modal's own failure is said inside the modal.** An open sheet or dialog
   hides the rest of the page, toasts included, from assistive technology. So
-  the compositor, the new-lead panel and both record panels pass `error` to
-  the kit (`role="alert"` above the footer) from their action's `catch`: a
-  failed send, a failed create, a failed note, a failed publish. The toast
+  the compositor, the visit dialog, the new-lead panel and both record panels
+  pass `error` to the kit (`role="alert"` above the footer) from their
+  action's `catch`: a failed send, a failed booking, a failed create, a failed
+  note, a failed reassignment, a failed publish. The toast
   stays for the sighted path; the panel is the announced one. The new-lead
   panel also refuses to close while the create is in flight.
 - **Toasts replace and dismiss by id.** The property search error carries
@@ -276,9 +290,15 @@ what applies here:
   in place); "preparing photos" carries `id: 'prop-fotos'` and is dismissed in
   the save's `finally`.
 - **`Select` is for the controls that drive a screen** (the board's property
-  filter, the new-lead property). A plain form field that posts stays a native
-  `<select>` (the property form's owner). `Select` carries `''` as a value
-  through a private sentinel; callers keep `''` for "all" / "none".
+  filter, the new-lead property, a lead's assignee, a visit's outcome on
+  Today, the agent on duty in Ajustes). A plain form field that posts stays a
+  native `<select>` (the property form's owner). `Select` carries `''` as a
+  value through a private sentinel; callers keep `''` for "all" / "none".
+  Inside a `<form>` Radix mirrors the value into a hidden native `<select>`,
+  and a value that changes in the same render as its options arrive finds no
+  `<option>` yet: the native control collapses to `''` and reports it back.
+  The visit dialog's two Selects therefore carry a `key` derived from their
+  option values, so they remount with value and options together.
 - **Outcomes are toasts, states are inline.** "Email sent", "could not save",
   "photos being prepared" go through `useToast()` (`ok`, `error`, neutral) and
   leave by themselves. A state the screen is in — loading, empty, a failed load,
@@ -343,6 +363,10 @@ open side panel, which is the bug the dialog fixes) and `select` (after only,
 the open list). *Before* is the deployed `origin/main` at `ad91331`; *after*
 is the vite preview of the branch, logged in as the CRM user, on the demo
 lead. Fourteen files, about 1.1 MB.
+
+`docs/review/e4-visits/` (2026-09-23) covers E4: the "Visitas de hoy"
+section on Today, the visit dialog, the lead panel with its assignee and
+visits, and the "Agentes" section of Ajustes. The PR body of #48 embeds them.
 
 ## Known open item, closed by the kit
 

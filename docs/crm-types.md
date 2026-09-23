@@ -4,8 +4,10 @@ The exported types of `src/crm/api.ts`, one snippet per type. They mirror the
 collections of the shared PocketBase, whose schema lives in the reference repo
 (`BroteaConnect/inmobiliaria`, `pb/schema.json`); the CRM never declares
 fields the schema does not have. The E1 block (visits, templates, campaigns,
-deliveries — BroteaConnect/inmobiliaria-crm#40) is **types only**: no screen,
-loader or mutator exists yet for `Visita`, `Plantilla`, `Campana` or `Envio`.
+deliveries — BroteaConnect/inmobiliaria-crm#40) arrived as types only.
+`Visita` has had loaders, mutators and screens since E4 (#48, 2026-09-23; see
+[docs/crm-visitas.md](crm-visitas.md)); `Plantilla`, `Campana` and `Envio` are
+still **types only**: no screen, loader or mutator exists for them.
 
 Field names keep the Spanish spelling of the production collections; select
 values are the schema's, verbatim.
@@ -32,11 +34,17 @@ export type EstadoEnvio =
 
 ## `Usuario`
 
-A row of the `users` auth collection, as seen through `expand`.
+A row of the `users` auth collection, as seen through `expand` or
+`loadUsuarios()`.
 
 ```ts
-export interface Usuario { id: string; email?: string; name?: string }
+export interface Usuario { id: string; email?: string; name?: string; avatar?: string; role?: string }
 ```
+
+`avatar` and `role` joined in E4 (#48). The `users` list/view rules are
+`@request.auth.id != ""` (any signed-in user), so `loadUsuarios()` lists the
+agency's agents by name; on an instance where the rule is still closed it
+resolves to the signed-in user alone and never throws (`src/lib/users.ts`).
 
 ## `Propiedad`
 
@@ -101,12 +109,19 @@ export type VisitaResultado = (typeof VISITA_RESULTADOS)[number];
 
 export interface Visita {
   id: string; lead: string; propiedad: string; agente: string;
-  cuando: string;                // ISO datetime of the appointment
+  cuando: string;                // ISO datetime of the appointment (UTC; shown in Europe/Madrid)
   resultado?: VisitaResultado; notas?: string;
   created: string; updated: string;
   expand?: { lead?: Lead; propiedad?: Propiedad; agente?: Usuario };
 }
+
+// What `crearVisita()` takes; `cuando` is `Date#toISOString()`.
+export interface NuevaVisita { lead: string; propiedad?: string; agente?: string; cuando: string; notas?: string }
 ```
+
+The loaders and mutators (`loadVisitasDeHoy`, `loadVisitasDeLead`,
+`crearVisita`, `actualizarVisita`, `onVisitasChange`) are in
+[docs/crm-visitas.md](crm-visitas.md).
 
 ## `Plantilla`
 
