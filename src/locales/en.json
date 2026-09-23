@@ -130,6 +130,7 @@
   "envio.entregado": "delivered",
   "envio.enviado": "sent",
   "envio.error": "could not be delivered",
+  "envio.simulado": "Simulated",
   "estadoProp.borrador": "draft",
   "estadoProp.publicada": "published",
   "estadoProp.reservada": "reserved",
