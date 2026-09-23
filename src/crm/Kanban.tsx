@@ -5,10 +5,12 @@ import { EditSheet } from '../components/kit/EditSheet';
 import { Dialog, Select, useToast } from '../components/ui';
 import { IconArrowLeft, IconArrowRight, IconoEmail, IconoTelefono, IconoWhatsApp } from '../components/kit/Icono';
 import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
+import { VisitaDialog, fechaHoraMadrid } from './VisitaDialog';
 import {
-  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad,
-  anotar, coincideLead, crearLead, desatendido, enviarEmail, haceCuanto, loadActividades, loadLeads,
-  loadPropiedades, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
+  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad, type Usuario,
+  type Visita, anotar, asignarLead, coincideLead, crearLead, desatendido, enviarEmail, haceCuanto,
+  loadActividades, loadLeads, loadPropiedades, loadUsuarios, loadVisitasDeLead, moverLead, onLeadsChange,
+  porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
 
 export default function Kanban() {
@@ -23,7 +25,14 @@ export default function Kanban() {
   const [nota, setNota] = useState<Record<string, string>>({});
   const [abierto, setAbierto] = useState<string | null>(null);
   const [historial, setHistorial] = useState<Actividad[]>([]);
+  const [visitas, setVisitas] = useState<Visita[]>([]);
   const [email, setEmail] = useState<{ lead: Lead; asunto: string; texto: string } | null>(null);
+  // The visit form is a dialog like the compositor: the record steps aside
+  // and comes back, visits reloaded, when the visit is booked or dropped.
+  const [visita, setVisita] = useState<Lead | null>(null);
+  // Who a lead can be handed to. Never an error: a closed users rule answers
+  // the signed-in agent alone (src/lib/users.ts).
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   // Feedback that belongs to no place on the board goes to a toast: it is
   // announced, it leaves by itself, and it never pushes the columns down.
   const toast = useToast();
@@ -48,6 +57,7 @@ export default function Kanban() {
     .finally(() => setCargado(true));
   useEffect(() => { recargar(); return onLeadsChange(recargar); }, []);
   useEffect(() => { loadPropiedades().then(setPropiedades).catch(() => {}); }, []);
+  useEffect(() => { loadUsuarios().then(setUsuarios); }, []);
 
   // El filtrado es 100% en cliente sobre la ventana que ya trae loadLeads.
   const visibles = leads.filter((l) =>
@@ -65,8 +75,35 @@ export default function Kanban() {
   const abiertoRef = useRef<string | null>(null);
   const abrir = (id: string | null) => { abiertoRef.current = id; setAbierto(id); setFichaError(null); };
   const cargarHistorial = async (id: string) => {
-    const acts = await loadActividades(id).catch(() => []);
-    if (abiertoRef.current === id) setHistorial(acts);
+    const [acts, vis] = await Promise.all([
+      loadActividades(id).catch(() => []),
+      loadVisitasDeLead(id).catch((): Visita[] => []),
+    ]);
+    if (abiertoRef.current === id) { setHistorial(acts); setVisitas(vis); }
+  };
+
+  /** Hand the open lead to an agent; '' is nobody. Said in the panel if it fails. */
+  const asignar = async (l: Lead, userId: string) => {
+    if ((l.asignado ?? '') === userId) return;
+    try {
+      await asignarLead(l.id, userId || null);
+      setFichaError(null);
+      recargar();
+    } catch (e) {
+      const msg = t('lead.asignadoError', { nombre: l.nombre, error: (e as Error).message });
+      setFichaError(msg);
+      toast({ title: msg, tone: 'error' });
+    }
+  };
+  const opcionesAgente = (l: Lead) => {
+    const out = [
+      { value: '', label: t('lead.asignadoNadie') },
+      ...usuarios.map((u) => ({ value: u.id, label: u.name || u.email || u.id })),
+    ];
+    // Assigned to somebody the directory does not list (the rule still closed
+    // on this instance): the value is kept and named, never silently dropped.
+    if (l.asignado && !usuarios.some((u) => u.id === l.asignado)) out.push({ value: l.asignado, label: t('lead.asignadoOtro') });
+    return out;
   };
 
   /** Open the record. The history is loaded before the panel appears, so it
@@ -82,12 +119,24 @@ export default function Kanban() {
   const abrirFicha = async (l: Lead) => {
     abrir(l.id);
     setHistorial([]);
+    setVisitas([]);
     await cargarHistorial(l.id);
+  };
+
+  // Like the compositor: the record closes while the visit is booked and
+  // reopens, visits reloaded, so the agent lands on the proof of it.
+  const programarVisita = (l: Lead) => { abrir(null); setVisita(l); };
+  const cerrarVisita = async () => {
+    if (!visita) return;
+    const l = visita;
+    setVisita(null);
+    await abrirFicha(l);
   };
 
   const verHistorial = async (l: Lead) => {
     if (abierto === l.id) { abrir(null); return; }
     setHistorial([]);
+    setVisitas([]);
     abrir(l.id);
     await cargarHistorial(l.id);
   };
@@ -173,6 +222,8 @@ export default function Kanban() {
 
   return (
     <>
+      {visita && <VisitaDialog lead={visita} onClose={cerrarVisita} onCreated={cerrarVisita} />}
+
       {email && (
         <Dialog
           open
@@ -315,6 +366,7 @@ export default function Kanban() {
               // (vacío) y no con el del último lead abierto.
               if (creado?.id) {
                 setHistorial([]);
+                setVisitas([]);
                 abrir(creado.id);
                 cargarHistorial(creado.id);
               }
@@ -410,10 +462,40 @@ export default function Kanban() {
             {levelOf(ficha.prioridad) === 'none' && <span className="sin">{t('lead.sinPrioridad')}</span>}
           </div>
 
+          <h3>{t('lead.asignadoTitulo')}</h3>
+          {/* Whose lead this is. A single value, edited where it is read, like
+              the priority above it; the web assigns the agent on duty
+              (Ajustes) and this is where that decision is overridden. */}
+          <Select
+            className="ficha-asignado"
+            value={ficha.asignado ?? ''}
+            onValueChange={(v) => asignar(ficha, v)}
+            ariaLabel={t('lead.asignadoAria', { nombre: ficha.nombre })}
+            options={opcionesAgente(ficha)}
+          />
+
           <h3>{t('lead.notaTitulo')}</h3>
           <input className="ficha-nota" placeholder={t('lead.nota')} value={nota[ficha.id] ?? ''}
             onChange={(e) => setNota((n) => ({ ...n, [ficha.id]: e.target.value }))}
             onKeyDown={(e) => e.key === 'Enter' && guardarNota(ficha)} />
+
+          <h3>{t('lead.visitas')}</h3>
+          <ul className="ficha-visitas">
+            {visitas.length === 0 && <li className="vacio">{t('lead.sinVisitas')}</li>}
+            {visitas.map((v) => {
+              const resultado = v.resultado ?? 'pendiente';
+              return (
+                <li key={v.id}>
+                  <time dateTime={v.cuando.replace(' ', 'T')}>{fechaHoraMadrid(locale, v.cuando)}</time>
+                  <span className="lugar">{v.expand?.propiedad?.titulo ?? t('filtros.sinPropiedad')}</span>
+                  <span className={`visita-estado visita-estado-${resultado}`}>{t(`visitas.resultado.${resultado}`)}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <button type="button" className="kit-btn kit-btn-ghost" onClick={() => programarVisita(ficha)}>
+            {t('lead.programarVisita')}
+          </button>
 
           <h3>{t('lead.historial')}</h3>
           <ul className="historial">

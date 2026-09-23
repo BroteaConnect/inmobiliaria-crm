@@ -51,6 +51,10 @@ export const DEFAULTS: SettingsMap = {
   // AED, que es en lo que estaban los precios antes de que esto fuera un
   // ajuste: cambiar de moneda no puede ser un efecto secundario de desplegar.
   'negocio.moneda': { v: 1, text: '' },
+  // The agent on duty: the `users` id the chassis assigns web leads to. Empty
+  // means nobody is on duty and a web lead arrives unassigned, which the board
+  // shows as such rather than hiding it under a made-up owner.
+  'agentes.guardia': { v: 1, text: '' },
 };
 
 
@@ -96,7 +100,8 @@ function coerce(key: string, value: unknown): SettingValue | null {
   // `numero` además de `text`: la fila del número de WhatsApp puede haberse
   // escrito a mano antes de que existiera esta pantalla, y una fila válida no
   // se descarta por el nombre del campo.
-  if (key.startsWith('negocio.') || key.startsWith('contacto.')) {
+  // `agentes.` holds ids, not prose, but it is the same shape: one line of text.
+  if (key.startsWith('negocio.') || key.startsWith('contacto.') || key.startsWith('agentes.')) {
     const texto = typeof raw.text === 'string' ? raw.text
       : typeof raw.numero === 'string' ? raw.numero : null;
     return texto === null ? null : { v: 1, text: texto.trim() };

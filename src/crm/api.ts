@@ -1,6 +1,9 @@
 import { fmtMoney, intlOf, t } from '../lib/i18n';
 // api.ts — typed helpers over the factory's PocketBase client for this CRM.
 import { list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
+import { currentUser } from '../lib/auth';
+import { madridTodayFilter } from '../lib/madrid-day';
+import { listUsersOrSelf } from '../lib/users';
 
 // La moneda es un dato del negocio (`negocio.moneda` en Ajustes), no una
 // constante: quien pinta el precio la pasa. Intl decide el formato por idioma
@@ -33,8 +36,8 @@ export interface Propiedad {
 export type CanalMensaje = 'email' | 'whatsapp';
 export type Idioma = 'es' | 'en';
 
-/** A row of the `users` auth collection, as seen through `expand`. */
-export interface Usuario { id: string; email?: string; name?: string }
+/** A row of the `users` auth collection, as seen through `expand` or `loadUsuarios`. */
+export interface Usuario { id: string; email?: string; name?: string; avatar?: string; role?: string }
 
 export interface Lead {
   id: string; nombre: string; telefono: string; email: string; mensaje: string;
@@ -262,7 +265,14 @@ export const desatendido = (l: Lead) =>
   (!l.ultimo_contacto || Date.now() - new Date(l.ultimo_contacto.replace(' ', 'T')).getTime() > 2 * 86400000);
 
 export const crearPropietario = (data: Partial<Propietario>) => create<Propietario>('propietarios', data);
-export const crearLead = (data: Partial<Lead>) => create<Lead>('leads', data);
+// A lead somebody types in belongs to that somebody: the board's "mine" filter
+// is empty otherwise. A caller that names an owner keeps it, and a break-glass
+// session (PocketBase token, no Brotea user) leaves the field unset rather
+// than inventing one.
+export const crearLead = (data: Partial<Lead>) => {
+  const me = currentUser();
+  return create<Lead>('leads', data.asignado || !me?.id ? data : { ...data, asignado: me.id });
+};
 export const crearPropiedad = (data: FormData | object) => create<Propiedad>('propiedades', data);
 export const actualizarPropiedad = (id: string, data: FormData | object) => update<Propiedad>('propiedades', id, data);
 
@@ -279,6 +289,44 @@ export const quitarFoto = (id: string, filename: string) =>
   actualizarPropiedad(id, { 'fotos-': [filename] });
 
 export const onLeadsChange = (cb: () => void) => subscribe(['leads/*'], cb);
+
+// --- visits and agents (E4) ---------------------------------------------------
+// The agenda reads visits by the agency's calendar day, not the browser's:
+// src/lib/madrid-day.ts owns that arithmetic (and its DST tests).
+
+/** Today's visits, "today" being the Madrid calendar day that contains `now`, soonest first. */
+export const loadVisitasDeHoy = (now: Date = new Date()) =>
+  listAll<Visita>('visitas', {
+    filter: madridTodayFilter('cuando', now), sort: 'cuando', expand: 'lead,propiedad,agente',
+  });
+
+/** Every visit of one lead, most recent first. */
+export const loadVisitasDeLead = (leadId: string) =>
+  listAll<Visita>('visitas', { filter: `lead="${leadId}"`, sort: '-cuando', expand: 'propiedad,agente' });
+
+/** What a new visit needs: `cuando` is an ISO UTC datetime (`Date#toISOString()`). */
+export interface NuevaVisita { lead: string; propiedad?: string; agente?: string; cuando: string; notas?: string }
+
+/** A visit is born `pendiente`; confirming it is a separate act. */
+export const crearVisita = (data: NuevaVisita) =>
+  create<Visita>('visitas', { ...data, resultado: 'pendiente' });
+
+export const actualizarVisita = (id: string, data: Partial<Pick<Visita, 'resultado' | 'cuando' | 'notas'>>) =>
+  update<Visita>('visitas', id, data);
+
+/** Hand a lead to an agent (a `users` id); null leaves it unassigned. */
+export const asignarLead = (id: string, userId: string | null) =>
+  update<Lead>('leads', id, { asignado: userId ?? '' });
+
+/**
+ * The agents a lead or a visit can be assigned to, by name. While the `users`
+ * rule is still closed on an instance the server answers 403/400: that is the
+ * signed-in agent alone, never an error (src/lib/users.ts).
+ */
+export const loadUsuarios = () =>
+  listUsersOrSelf(() => listAll<Usuario>('users', { sort: 'name' }), currentUser);
+
+export const onVisitasChange = (cb: () => void) => subscribe(['visitas/*'], cb);
 
 // --- configuration (the `settings` collection) --------------------------------
 // One row per key. This project's schema format declares no indexes, so `key`

@@ -5,12 +5,13 @@ import { ETAPAS, loadActividadesRecientes, loadLeads, type Actividad, type Lead 
 import { embudo, nuevos, periodos, procedencia, tiempoPrimeraRespuesta, variacion } from './informes';
 import './informes.css';
 
-// Lo que el CRM puede saber de sí mismo, y nada más.
+// What the CRM can know about itself, and nothing else.
 //
-// El diseño (6a) dibuja además visitas realizadas, comisión, no-shows y
-// rendimiento por agente. No hay colección de visitas, ni campo de comisión, ni
-// asignación de agente: esas cifras no se pueden calcular, así que no se pintan
-// ni se rellenan con ceros. La nota al pie lo dice, para quien venga buscándolas.
+// The design (6a) also draws visits done, commission, no-shows and per-agent
+// performance. Visits and the assigned agent are data now (E4: `visitas`,
+// `leads.asignado`); this report still reads leads and activities only, and
+// commission has no field, so those figures are not painted and not filled in
+// with zeros. The footnote says so, for whoever comes looking for them.
 
 const DIAS = 30;
 

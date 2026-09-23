@@ -153,3 +153,28 @@ test('una moneda que Intl no entendería no llega a Intl', () => {
     assert.equal(monedaDe(s), MONEDA_POR_DEFECTO, malo);
   }
 });
+
+// — The on-duty agent —————————————————————————————————————————————
+// `agentes.guardia` is the `users` id the chassis hands web leads to. It is
+// written by hand today, so the shape has to survive the same hand.
+
+test('agentes.guardia is a users id read as text', () => {
+  const s = mergeSettings([{ key: 'agentes.guardia', value: { v: 1, text: 'abc123def456ghi' } }]);
+  assert.equal(textOf(s, 'agentes.guardia'), 'abc123def456ghi');
+});
+
+test('nobody on duty by default, and a broken row keeps it that way', () => {
+  assert.equal(textOf(mergeSettings([]), 'agentes.guardia'), '');
+  assert.equal(textOf(DEFAULTS, 'agentes.guardia'), '');
+  const s = mergeSettings([{ key: 'agentes.guardia', value: { v: 1, enabled: true } }]);
+  assert.equal(textOf(s, 'agentes.guardia'), '', 'a value with no text is not an id');
+});
+
+test('an agentes.* key the app does not read is still dropped', () => {
+  const s = mergeSettings([
+    { key: 'agentes.turno', value: { v: 1, text: 'noche' } },
+    { key: 'agentes.guardia', value: { v: 1, text: ' u1 ' } },
+  ]);
+  assert.equal('agentes.turno' in s, false);
+  assert.equal(textOf(s, 'agentes.guardia'), 'u1', 'and the known one is trimmed like any text');
+});

@@ -12,3 +12,9 @@
   border-radius: var(--radius); padding: var(--space-3); font-size: .85rem; }
 .campo-pendiente { color: var(--alert); font-weight: 600; font-size: .78rem; }
 .ajustes .campo input { max-width: 26rem; }
+/* The agent on duty: a select in the row, at the width a name needs. */
+.ajustes-guardia .ui-select { flex: 0 0 auto; min-width: 12rem; max-width: 100%; }
+@media (max-width: 479.98px) {
+  .ajustes-guardia { flex-wrap: wrap; }
+  .ajustes-guardia .ui-select { flex: 1 1 100%; }
+}
