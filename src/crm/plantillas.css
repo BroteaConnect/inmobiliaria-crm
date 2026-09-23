@@ -1,0 +1,189 @@
+/* Ajustes → Plantillas: the repository's list, the bilingual editor and the
+   send dialog. Tokens only (docs/theme-contract.md in the platform) — no hex,
+   no cubic-bezier, no bare milliseconds; the press on every control comes from
+   base.css through `--press-scale`, and reduced motion is already handled
+   there. The pills follow the `.estado` recipe of crm.css: the colour in the
+   background at 22%, the word in `--text`, which is what keeps them readable
+   in both schemes. */
+
+.plantillas-pagina { max-width: 960px; }
+/* The page is a screen of Ajustes and says so on the way out. */
+.plantillas-pagina .volver {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px;
+  color: var(--muted); font-size: .85rem; text-decoration: none;
+}
+.plantillas-pagina .volver:hover { color: var(--text); }
+.plantillas-pagina h1 { text-wrap: balance; }
+.plantillas-pagina .ajustes-intro { text-wrap: pretty; max-width: var(--measure); }
+.plantillas-pagina .list-status { color: var(--muted); margin: var(--space-4) 0 0; font-size: .9rem; }
+.plantillas-pagina .list-status.error { color: var(--danger-strong); }
+/* The sheet opens with a sentence, then the first field: they are two things. */
+.plantilla-ayuda { margin-bottom: var(--space-3); }
+.plantillas-cuenta {
+  margin: var(--space-3) 0 0; color: var(--muted); font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Search and the two filters. They wrap before they shrink: a select narrower
+   than its longest option is a control that hides its own answer. */
+.plantillas-filtros {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-3);
+}
+.plantillas-filtros .buscador { flex: 1 1 14rem; min-height: 44px; }
+.plantillas-filtros .ui-select { flex: 0 1 auto; min-width: 11rem; min-height: 44px; }
+/* On a phone the two filters share a row instead of taking one each: three
+   stacked controls push the first template below the fold. */
+@media (max-width: 479.98px) {
+  .plantillas-filtros .buscador { flex: 1 1 100%; }
+  .plantillas-filtros .ui-select { flex: 1 1 8rem; min-width: 0; }
+}
+
+/* A data table at the density of a list, one row per template. The name is the
+   way in; the rest is read, not pressed. */
+.plantillas-tabla { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.plantillas-tabla th {
+  text-align: start; padding: 0 var(--space-2) var(--space-1) 0;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+/* The one column that cannot be sorted keeps the exact box of the ones that
+   can, so the header row sits on one baseline. */
+.plantillas-tabla th:last-child {
+  font-size: .68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted); line-height: 40px;
+}
+.plantillas-tabla td {
+  padding: var(--space-1) var(--space-2) var(--space-1) 0; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.plantillas-tabla code { font-size: .74rem; color: var(--muted); }
+/* Sorting is a button, so it is reachable by keyboard and announced; the
+   direction is a caret AND `aria-sort`, never colour alone. */
+.plantillas-tabla .ordenar {
+  display: inline-flex; align-items: center; gap: var(--space-1); min-height: 40px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: .68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted);
+  transition-property: color; transition-duration: var(--duration-fast); transition-timing-function: var(--ease-out);
+}
+.plantillas-tabla .ordenar:hover { color: var(--text); }
+.plantillas-tabla .ordenar::after { content: ''; width: .6em; }
+.plantillas-tabla .orden-asc, .plantillas-tabla .orden-desc { color: var(--text); }
+.plantillas-tabla .orden-asc::after { content: '\2191'; }
+.plantillas-tabla .orden-desc::after { content: '\2193'; }
+.plantillas-tabla .col-num { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The heading of a right-aligned column sits over its digits, not away from them. */
+.plantillas-tabla th.col-num .ordenar { width: 100%; justify-content: flex-end; }
+/* 44px tall on its own, no pseudo-element needed: the row is the target. */
+.plantilla-abrir {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none;
+  font: inherit; font-weight: 600; color: var(--text); text-align: start; cursor: pointer;
+}
+.plantilla-abrir:hover { text-decoration: underline; }
+.plantilla-na { color: var(--muted); font-size: .78rem; }
+
+.plantilla-estado, .content-estado {
+  display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: 999px; padding: 2px 10px; color: var(--text); white-space: nowrap;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+}
+.plantilla-estado-aprobada, .content-estado-approved { background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.content-estado-pending, .content-estado-received, .content-estado-paused { background: color-mix(in srgb, var(--warn) 22%, transparent); }
+.plantilla-estado-retirada, .content-estado-rejected, .content-estado-disabled { background: color-mix(in srgb, var(--danger) 22%, transparent); }
+/* Two Contents per template (es, en): the code says which, the tint how it went. */
+.content-estados { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.pill-idioma { opacity: .7; margin-inline-end: 6px; }
+
+/* Under 720px the table stacks: one card per template, the name first, the
+   column name in front of each value. Never a sideways scroll. */
+@media (max-width: 719.98px) {
+  .plantillas-tabla, .plantillas-tabla tbody { display: block; }
+  .plantillas-tabla thead { display: none; }
+  .plantillas-tabla tr {
+    display: grid; grid-template-columns: 1fr; gap: var(--space-1);
+    padding: var(--space-2) 0 var(--space-3); border-bottom: 1px solid var(--border);
+  }
+  .plantillas-tabla td {
+    display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--space-2); align-items: center;
+    /* Without this a pill becomes a grid item and stretches the whole row: a
+       state badge as wide as the card reads as a banner, not as a state. */
+    justify-items: start;
+    padding: 0; border: 0;
+  }
+  .plantillas-tabla td::before {
+    content: attr(data-label); font-size: .68rem; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .plantillas-tabla td.col-num { text-align: start; }
+  .plantillas-tabla td:nth-child(2) { order: -1; grid-template-columns: 1fr; }
+  .plantillas-tabla td:nth-child(2)::before { content: none; }
+  .plantilla-abrir { font-size: .95rem; }
+}
+
+/* The two languages side by side: one text in two versions, compared rather
+   than scrolled between. On a phone they stack, Spanish first. */
+.idiomas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-4); }
+.idiomas h3 {
+  margin: 0 0 var(--space-2); font-size: .72rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted);
+}
+@media (max-width: 719.98px) { .idiomas { grid-template-columns: 1fr; } }
+
+/* The declared variables, as tokens: a name and its cross. Outer radius =
+   inner radius + padding, so the cross sits concentric in its token. */
+.variables-lista { list-style: none; margin: .3rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.variable-token {
+  display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px;
+  padding: 0 var(--space-1) 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); font-weight: 400;
+}
+.variable-token code { font-size: .82rem; }
+/* Drawn at 36px, hit at 44px: the extension is 4px, half the 8px gap between
+   tokens, so two crosses never overlap. */
+.variable-quitar {
+  width: 36px; height: 36px; padding: 0; position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: calc(var(--radius) - var(--space-1)); background: none; color: var(--muted); cursor: pointer;
+  transition-property: color, background-color;
+  transition-duration: var(--duration-fast); transition-timing-function: var(--ease-out);
+}
+.variable-quitar::after { content: ''; position: absolute; inset: -4px; }
+.variable-quitar:hover { color: var(--danger-strong); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.campo #plantilla-variable { font-family: ui-monospace, monospace; font-size: .85rem; }
+
+/* Twilio, inside the editor: the state of each Content, why when it was
+   refused, and the one call this screen makes — reading the state back. */
+.twilio { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.twilio h3 { margin: 0 0 var(--space-1); font-size: .95rem; }
+.twilio-estados { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.twilio-motivo { margin: 0 0 var(--space-2); font-size: .85rem; color: var(--danger-strong); overflow-wrap: anywhere; }
+
+/* --- the send dialog --- */
+/* What the lead will receive, as text: the subject in bold when there is one,
+   the body with its line breaks kept. */
+.plantilla-preview {
+  margin-top: .3rem; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); font-weight: 400; font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.plantilla-preview strong { display: block; margin-bottom: var(--space-2); }
+.plantilla-preview p { margin: 0; }
+/* The values the placeholders take, one box each, named after the variable. */
+.variables-extra { border: 0; padding: 0; margin: 0 0 var(--space-3); min-width: 0; }
+.variables-extra legend { font-weight: 600; font-size: .85rem; padding: 0; margin-bottom: var(--space-1); }
+.variables-extra .pista { margin-bottom: var(--space-2); }
+.variables-extra .campo code { font-size: .82rem; }
+/* The channel is a word, the template is a sentence: they do not get the same
+   half of the row. */
+.enviar-campos { grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); }
+@media (max-width: 479.98px) { .enviar-campos { grid-template-columns: 1fr; } }
+
+/* What the chassis will do with this template, said before the send. The tint
+   goes underneath and the sentence stays in `--text`: a solid --warn fill with
+   --bg text fails contrast in light mode. */
+.plantilla-reparo {
+  margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius); color: var(--text); font-size: .85rem; font-weight: 600;
+  text-wrap: pretty;
+}
+.plantilla-reparo-aviso { background: color-mix(in srgb, var(--warn) 18%, transparent); }
+.plantilla-reparo-bloqueo { background: color-mix(in srgb, var(--danger) 16%, transparent); }

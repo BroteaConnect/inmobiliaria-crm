@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useI18n } from '../lib/LocaleContext';
 import { useSettings } from '../lib/SettingsContext';
 import {
@@ -118,6 +119,19 @@ export default function Ajustes() {
             ariaLabel={t('ajustes.agentes.guardia')}
             options={opcionesGuardia}
           />
+        </div>
+      </div>
+
+      <h2>{t('ajustes.plantillas')}</h2>
+      <p className="ajustes-intro">{t('ajustes.plantillas.intro')}</p>
+      <div className="ajustes-lista">
+        <div className="ajustes-fila">
+          <div className="ajustes-fila-texto">
+            <span className="ajustes-fila-nombre">{t('ajustes.plantillas.nombre')}</span>
+            <span className="ajustes-fila-hint">{t('ajustes.plantillas.hint')}</span>
+          </div>
+          {/* A link and not a button: it is a place, and a place has an address. */}
+          <Link className="kit-btn kit-btn-ghost" to="/ajustes/plantillas">{t('ajustes.plantillas.abrir')}</Link>
         </div>
       </div>
 
