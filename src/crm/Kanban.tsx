@@ -6,11 +6,12 @@ import { Dialog, Select, useToast } from '../components/ui';
 import { IconArrowLeft, IconArrowRight, IconoEmail, IconoTelefono, IconoWhatsApp } from '../components/kit/Icono';
 import { PRIORITY_LEVELS, levelOf, priorityLabelKey, scoreOf } from './priority';
 import { VisitaDialog, fechaHoraMadrid } from './VisitaDialog';
+import { EnviarPlantilla } from './EnviarPlantilla';
 import {
-  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Etapa, type Lead, type Propiedad, type Usuario,
-  type Visita, anotar, asignarLead, coincideLead, crearLead, desatendido, enviarEmail, haceCuanto,
-  loadActividades, loadLeads, loadPropiedades, loadUsuarios, loadVisitasDeLead, moverLead, onLeadsChange,
-  porPrioridad, registrarContacto, setPrioridad, waLink,
+  ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Envio, type Etapa, type Lead, type Plantilla,
+  type Propiedad, type Usuario, type Visita, anotar, asignarLead, coincideLead, crearLead, desatendido,
+  enviarEmail, haceCuanto, loadActividades, loadEnviosDeLead, loadLeads, loadPlantillas, loadPropiedades,
+  loadUsuarios, loadVisitasDeLead, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
 
 export default function Kanban() {
@@ -25,11 +26,19 @@ export default function Kanban() {
   const [nota, setNota] = useState<Record<string, string>>({});
   const [abierto, setAbierto] = useState<string | null>(null);
   const [historial, setHistorial] = useState<Actividad[]>([]);
+  // The delivery evidence of the open lead. The activity is what the agent
+  // reads; the `envios` row is what says WHICH template, in which version,
+  // went out — so the history line carries it rather than a second list.
+  const [envios, setEnvios] = useState<Envio[]>([]);
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [email, setEmail] = useState<{ lead: Lead; asunto: string; texto: string } | null>(null);
   // The visit form is a dialog like the compositor: the record steps aside
   // and comes back, visits reloaded, when the visit is booked or dropped.
   const [visita, setVisita] = useState<Lead | null>(null);
+  // Sending a template: the record steps aside for the dialog, like the email
+  // compositor, and comes back with the send in its history.
+  const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
+  const [envio, setEnvio] = useState<{ lead: Lead; actividades: Actividad[] } | null>(null);
   // Who a lead can be handed to. Never an error: a closed users rule answers
   // the signed-in agent alone (src/lib/users.ts).
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -58,6 +67,10 @@ export default function Kanban() {
   useEffect(() => { recargar(); return onLeadsChange(recargar); }, []);
   useEffect(() => { loadPropiedades().then(setPropiedades).catch(() => {}); }, []);
   useEffect(() => { loadUsuarios().then(setUsuarios); }, []);
+  // The repository, once: it is thirty rows that change when somebody edits
+  // them in Ajustes, not per lead. A failure leaves the list empty and the
+  // dialog says there is nothing to send.
+  useEffect(() => { loadPlantillas().then(setPlantillas).catch(() => {}); }, []);
 
   // El filtrado es 100% en cliente sobre la ventana que ya trae loadLeads.
   const visibles = leads.filter((l) =>
@@ -75,12 +88,15 @@ export default function Kanban() {
   const abiertoRef = useRef<string | null>(null);
   const abrir = (id: string | null) => { abiertoRef.current = id; setAbierto(id); setFichaError(null); };
   const cargarHistorial = async (id: string) => {
-    const [acts, vis] = await Promise.all([
+    const [acts, vis, envs] = await Promise.all([
       loadActividades(id).catch(() => []),
       loadVisitasDeLead(id).catch((): Visita[] => []),
+      loadEnviosDeLead(id),
     ]);
-    if (abiertoRef.current === id) { setHistorial(acts); setVisitas(vis); }
+    if (abiertoRef.current === id) { setHistorial(acts); setVisitas(vis); setEnvios(envs); }
   };
+  /** The delivery that produced an activity, when there is one. */
+  const envioDe = (actividadId: string) => envios.find((e) => e.actividad === actividadId) ?? null;
 
   /** Hand the open lead to an agent; '' is nobody. Said in the panel if it fails. */
   const asignar = async (l: Lead, userId: string) => {
@@ -120,6 +136,7 @@ export default function Kanban() {
     abrir(l.id);
     setHistorial([]);
     setVisitas([]);
+    setEnvios([]);
     await cargarHistorial(l.id);
   };
 
@@ -133,10 +150,23 @@ export default function Kanban() {
     await abrirFicha(l);
   };
 
+  // The activities travel with the lead: the dialog reads Meta's 24-hour
+  // window off them, and asking the server a second time for what the record
+  // already has would be a round trip for a fact already on screen.
+  const abrirEnvio = (l: Lead) => { setEnvio({ lead: l, actividades: historial }); abrir(null); };
+  const cerrarEnvio = async () => {
+    if (!envio) return;
+    const l = envio.lead;
+    setEnvio(null);
+    recargar();
+    await abrirFicha(l);
+  };
+
   const verHistorial = async (l: Lead) => {
     if (abierto === l.id) { abrir(null); return; }
     setHistorial([]);
     setVisitas([]);
+    setEnvios([]);
     abrir(l.id);
     await cargarHistorial(l.id);
   };
@@ -205,7 +235,7 @@ export default function Kanban() {
     setEnviando(true);
     setEmailError(null);
     try {
-      await enviarEmail(email.lead, email.asunto, email.texto);
+      await enviarEmail(email.lead, email.asunto, email.texto, locale);
       toast({ title: t('email.enviado', { nombre: email.lead.nombre }), tone: 'ok' });
       recargar();
       await cerrarEmail();
@@ -223,6 +253,16 @@ export default function Kanban() {
   return (
     <>
       {visita && <VisitaDialog lead={visita} onClose={cerrarVisita} onCreated={cerrarVisita} />}
+
+      {envio && (
+        <EnviarPlantilla
+          lead={envio.lead}
+          actividades={envio.actividades}
+          plantillas={plantillas}
+          onClose={cerrarEnvio}
+          onSent={cerrarEnvio}
+        />
+      )}
 
       {email && (
         <Dialog
@@ -425,6 +465,13 @@ export default function Kanban() {
                 <a className="kit-wa" href={waLink(ficha)} target="_blank" rel="noreferrer"
                   onClick={() => contactar(ficha, 'whatsapp')}><IconoWhatsApp /> WhatsApp</a>
               )}
+              {/* A ghost beside the compositor, not a second primary: both are
+                  ways of writing to this lead, and the screen asks one question. */}
+              {(ficha.telefono || ficha.email) && (
+                <button className="kit-btn kit-btn-ghost" onClick={() => abrirEnvio(ficha)}>
+                  {t('plantillas.enviar.boton')}
+                </button>
+              )}
               {ficha.email && (
                 <button className="kit-btn kit-btn-primary" onClick={() => redactar(ficha)}>
                   <IconoEmail /> {t('email.enviar')}
@@ -500,17 +547,30 @@ export default function Kanban() {
           <h3>{t('lead.historial')}</h3>
           <ul className="historial">
             {historial.length === 0 && <li className="vacio">{t('lead.sinContactos')}</li>}
-            {historial.map((a) => (
+            {historial.map((a) => {
+              const e = envioDe(a.id);
+              return (
               <li key={a.id}>
                 <span>{etiquetaCanal(locale, a.tipo)}</span>
                 <span className="cuando">{haceCuanto(locale, a.created)}</span>
                 {a.estado_envio && etiquetaEnvio(locale, a.estado_envio) && (
                   <span className={`envio envio-${a.estado_envio}`}>{etiquetaEnvio(locale, a.estado_envio)}</span>
                 )}
+                {/* Which template left, and in which version: `envios` records
+                    it and a history that only says "email" cannot answer
+                    "which one did we send them?". */}
+                {e?.expand?.plantilla && (
+                  <span className="envio-plantilla">
+                    {e.expand.plantilla.nombre}
+                    {e.plantilla_version ? ` · ${t('plantillas.version', { n: String(e.plantilla_version) })}` : ''}
+                  </span>
+                )}
                 {a.asunto && <span className="asunto">{a.asunto}</span>}
                 {a.nota && <span className="texto">{a.nota}</span>}
+                {e?.error_texto && <span className="envio-fallo">{t('plantillas.enviar.fallo', { error: e.error_texto })}</span>}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </SidePanel>
       )}

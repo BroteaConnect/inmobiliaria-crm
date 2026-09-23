@@ -119,6 +119,8 @@ export interface Plantilla {
   evento?: string;
   estado?: PlantillaEstado; version?: number;
   content_sid?: string; content_estado?: ContentEstado; content_motivo?: string;
+  /** The English Twilio Content: the chassis submits and reads back one per language. */
+  content_sid_en?: string; content_estado_en?: ContentEstado; content_motivo_en?: string;
   created: string; updated: string;
 }
 
@@ -156,6 +158,7 @@ export interface Envio {
   enviado_en?: string; entregado_en?: string; abierto_en?: string; click_en?: string;
   error_en?: string; error_codigo?: string; error_texto?: string;
   created: string; updated: string;
+  expand?: { plantilla?: Plantilla };
 }
 
 // Paging lives in the db brick now: this app had its own copy for exactly one
@@ -331,6 +334,96 @@ export const loadUsuarios = () =>
 
 export const onVisitasChange = (cb: () => void) => subscribe(['visitas/*'], cb);
 
+// --- templates and sends (E5) -------------------------------------------------
+// The template rows are read and edited here; every SEND goes through the
+// chassis, which holds the provider credentials and writes the activity and
+// the `envios` row. There is exactly one send path in this app — the one
+// `enviarEmail` has always used — and this block widens it rather than
+// opening a second one: same host, same secret, same "the CRM never guesses a
+// success" rule. A non-2xx, or a 200 carrying `ok: false`, is a ChassisError
+// with the sentence the chassis chose.
+
+const CHASSIS_URL = 'https://api.brotea.dev';
+
+/** A refusal or a failure from the chassis, with its own sentence kept. */
+export class ChassisError extends Error {
+  status: number;
+  detail?: unknown;
+  constructor(message: string, status: number, detail?: unknown) {
+    super(message);
+    this.name = 'ChassisError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+type ChassisPath = '/send-email' | '/send-whatsapp' | '/content/sync';
+
+/** The sentence for the agent, in the order the chassis contract names it:
+ *  `error.text`, then `error.code`, then `error` as a string, then
+ *  `detail`, then the bare status. */
+function textoDeChasis(detail: unknown, status: number): string {
+  const d = detail as { error?: { text?: string; code?: string } | string; detail?: string } | null;
+  if (d && typeof d === 'object') {
+    const e = d.error;
+    if (e && typeof e === 'object') {
+      if (e.text) return String(e.text);
+      if (e.code) return String(e.code);
+    }
+    if (typeof e === 'string' && e) return e;
+    if (typeof d.detail === 'string' && d.detail) return d.detail;
+  }
+  return `HTTP ${status}`;
+}
+
+async function chassis<T extends { ok?: boolean }>(path: ChassisPath, body: object, locale: string): Promise<T> {
+  const secret = import.meta.env.PUBLIC_OUTBOUND_SECRET as string | undefined;
+  if (!secret) throw new Error(t(locale, 'chasis.sinConfigurar'));
+  const res = await fetch(`${CHASSIS_URL}${path}?secret=${encodeURIComponent(secret)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({})) as T;
+  if (!res.ok) throw new ChassisError(textoDeChasis(json, res.status), res.status, json);
+  if (json && json.ok === false) throw new ChassisError(textoDeChasis(json, res.status), res.status, json);
+  return json;
+}
+
+export const loadPlantillas = () => listAll<Plantilla>('plantillas', { sort: 'canal,clave' });
+/** Only the editable columns travel (plantilla-form.ts builds the body): never clave, canal, evento or content_*. */
+export const guardarPlantilla = (id: string, data: Record<string, unknown>) =>
+  update<Plantilla>('plantillas', id, data);
+
+export interface ContentResult {
+  ok?: boolean; clave: string;
+  content_sid?: string; content_sid_en?: string;
+  content_estado?: ContentEstado; content_estado_en?: ContentEstado;
+  content_motivo?: string; content_motivo_en?: string;
+}
+/** Read Twilio's approval state back into the rows. Reads and records; it submits nothing. */
+export const sincronizarContent = (clave: string, locale: string) =>
+  chassis<{ ok: boolean; updated?: ContentResult[] }>('/content/sync', { clave }, locale);
+
+export interface EnvioPlantilla { lead_id: string; plantilla: string; variables: Record<string, string> }
+export interface EnvioResult {
+  ok?: boolean; envio_id?: string; actividad_id?: string | null; mensaje_id?: string;
+  estado?: EstadoEnvio; via?: string;
+}
+/**
+ * Send one template to one lead. The chassis resolves the address, the
+ * language (from the lead's `idioma`) and the channel rules; the CRM says
+ * who, which template and with which values, and nothing else.
+ */
+export const enviarPlantilla = (canal: CanalMensaje, body: EnvioPlantilla, locale: string) =>
+  chassis<EnvioResult>(canal === 'whatsapp' ? '/send-whatsapp' : '/send-email', body, locale);
+
+/** The delivery evidence of one lead, newest first. Never throws: no rows is no rows. */
+export const loadEnviosDeLead = (leadId: string) =>
+  list<Envio>('envios', { filter: `lead="${leadId}"`, sort: '-created', perPage: '100', expand: 'plantilla' })
+    .then((r) => r.items)
+    .catch((): Envio[] => []);
+
 // --- configuration (the `settings` collection) --------------------------------
 // One row per key. This project's schema format declares no indexes, so `key`
 // uniqueness cannot be expressed declaratively — it is enforced here instead,
@@ -388,11 +481,14 @@ export async function normalizaFoto(f: File, locale = 'es'): Promise<File> {
 
 // El envío real lo hace el chasis (las credenciales SMTP nunca llegan al
 // navegador); aquí solo pedimos el envío y él registra la actividad.
-const OUTBOUND_URL = 'https://api.brotea.dev/send-email';
+const OUTBOUND_URL = `${CHASSIS_URL}/send-email`;
 
-export async function enviarEmail(lead: Lead, asunto: string, texto: string) {
+// `locale` because the one failure that is the app's own — no secret in this
+// build — is shown to the agent, and it was the last Spanish sentence the
+// English UI printed.
+export async function enviarEmail(lead: Lead, asunto: string, texto: string, locale = 'es') {
   const secret = import.meta.env.PUBLIC_OUTBOUND_SECRET as string | undefined;
-  if (!secret) throw new Error('el envío de email no está configurado en esta app');
+  if (!secret) throw new Error(t(locale, 'chasis.sinConfigurar'));
   const res = await fetch(`${OUTBOUND_URL}?secret=${encodeURIComponent(secret)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

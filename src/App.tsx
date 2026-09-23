@@ -15,6 +15,7 @@ import Kanban from './crm/Kanban';
 import Propiedades from './crm/Propiedades';
 import Importar from './crm/Importar';
 import Ajustes from './crm/Ajustes';
+import Plantillas from './crm/Plantillas';
 import Today from './features/today/Today';
 import Informes from './features/informes/Informes';
 
@@ -134,6 +135,9 @@ function Shell() {
           <Route path="/importar" element={<Gate module="modules.imports"><Importar /></Gate>} />
           <Route path="/informes" element={<Gate module="modules.reports"><Informes /></Gate>} />
           <Route path="/ajustes" element={<Ajustes />} />
+          {/* A screen of Ajustes, at its own address so it can be linked and
+              bookmarked: the repository is read far more often than the switches. */}
+          <Route path="/ajustes/plantillas" element={<Plantillas />} />
           {features.map((f) => (
             <Route key={f.path} path={f.path} element={f.element} />
           ))}

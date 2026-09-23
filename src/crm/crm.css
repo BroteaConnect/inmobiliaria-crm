@@ -450,3 +450,10 @@ select:focus-visible, textarea:focus-visible {
 @media (max-width: 419.98px) {
   .campos-2 { grid-template-columns: 1fr; }
 }
+
+/* --- templates in the record history (E5) --- */
+/* Which template left and in which version: the ledger row beside the activity
+   it produced, so a history that says "email" can also answer "which one did we
+   send them?". */
+.historial .envio-plantilla { color: var(--muted); }
+.historial .envio-fallo { flex-basis: 100%; color: var(--danger-strong); overflow-wrap: anywhere; }
