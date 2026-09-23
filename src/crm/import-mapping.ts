@@ -19,10 +19,11 @@
 //     re-import of a CSV that was first imported WITH the junk in the title
 //     creates no second property.
 //
-// TWIN FILE: the JUNK list and the `esZonaValida` rules (minus the length
-// cap) are to be mirrored as `JUNK_ZONA` / `esZonaValida` in `jobs/lib.mjs`
-// of BroteaConnect/inmobiliaria (landing PR of the same E5 phase). Change one,
-// change the other, and keep the two vector tables in their tests identical.
+// TWIN FILE: `jobs/lib.mjs` of BroteaConnect/inmobiliaria (the matcher,
+// PR #46) carries `JUNK_ZONA` / `esZonaValida`. The two lists are identical
+// as of 2026-09-23 and so is the minimum length; the 80-char cap is CRM-only
+// (the matcher has no length cap). Change one, change the other, and keep the
+// two vector tables in their tests identical.
 //
 // The field NAMES are PocketBase's and stay as they are in the database.
 
@@ -77,17 +78,21 @@ export function adivina(header: string): Campo {
 
 /**
  * Cell values that are a header repeated, a placeholder or a "no data" word,
- * never a zone. Lowercase, single-spaced. The list `JUNK_ZONA` of the landing
- * repo mirrors (see the header comment).
+ * never a zone. Lowercase, single-spaced. Identical to `JUNK_ZONA` in the
+ * landing repo (see the header comment). The three "… name" entries are a
+ * header row that leaked into the live data.
  */
 export const JUNK = [
   'master project', 'masterproject', 'project', 'area', 'community', 'district',
   'municipio', 'zona', 'n/a', 'na', 'none', 'null', 'nil', 'tbd', 'unknown',
-  'desconocido', 'sin datos',
+  'desconocido', 'sin datos', 'building name', 'project name', 'proejct name',
 ];
 
 const RE_ONLY_SYMBOLS = /^[\p{P}\p{S}\s]+$/u;
 const RE_NUMERIC = /^[\d.,\s-]+$/;
+// Shorter than three characters is a code or a typo, never a zone ("v3",
+// "ok"); "JLT" is the shortest real one. The cap is CRM-only.
+const MIN_ZONA = 3;
 const MAX_ZONA = 80;
 
 const collapse = (v: string) => v.trim().replace(/\s+/g, ' ');
@@ -95,7 +100,7 @@ const collapse = (v: string) => v.trim().replace(/\s+/g, ' ');
 /** A zone the matcher may put in its vocabulary. */
 export function esZonaValida(v: string): boolean {
   const s = collapse(v);
-  if (!s || s.length > MAX_ZONA) return false;
+  if (s.length < MIN_ZONA || s.length > MAX_ZONA) return false;
   if (RE_ONLY_SYMBOLS.test(s) || RE_NUMERIC.test(s)) return false;
   return !JUNK.includes(s.toLowerCase());
 }
