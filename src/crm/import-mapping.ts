@@ -10,18 +10,19 @@
 // the vocabulary and every historical lead carrying the same junk becomes a
 // candidate for every property carrying it. So:
 //
-//   · the building name reaches its own field (`edificio`), never only the
-//     title;
+//   · the building name reaches its own field (`edificio`; `proyecto` and
+//     `edificio` are added to pb/schema.json by the landing repo, and the CRM
+//     sends them only once that schema is applied), never only the title;
 //   · a junk zone is dropped, and the Area/Community column is a fallback
 //     for a junk Master Project;
 //   · the duplicate key of a title ignores its leading junk segments, so a
 //     re-import of a CSV that was first imported WITH the junk in the title
 //     creates no second property.
 //
-// TWIN FILE: `jobs/lib.mjs` in the landing repo (BroteaConnect/inmobiliaria)
-// carries the same JUNK list as `JUNK_ZONA` and the same `esZonaValida` rules
-// (minus the length cap). Change one, change the other, and keep the two
-// vector tables in their tests identical.
+// TWIN FILE: the JUNK list and the `esZonaValida` rules (minus the length
+// cap) are to be mirrored as `JUNK_ZONA` / `esZonaValida` in `jobs/lib.mjs`
+// of BroteaConnect/inmobiliaria (landing PR of the same E5 phase). Change one,
+// change the other, and keep the two vector tables in their tests identical.
 //
 // The field NAMES are PocketBase's and stay as they are in the database.
 
@@ -66,7 +67,9 @@ export function adivina(header: string): Campo {
   if (/habitacion|dormitor|bedroom/.test(s)) return 'habitaciones';
   if (/bañ|bathroom/.test(s)) return 'banos';
   if (/^area( ?name)?( ?en)?$|community|district|comunidad|barrio/.test(s)) return 'zona';
-  if (/superficie|metros|m2|m²|\bsize\b|sqft|sq\.? ?ft|area ?\(/.test(s)) return 'superficie';
+  // A trailing "area" sits AFTER the zona rule: "Built-up Area" / "Plot Area" /
+  // "Carpet Area" are sizes, "Area" / "AreaNameEn" already went to zona.
+  if (/superficie|metros|m2|m²|\bsize\b|sqft|sq\.? ?ft|area ?\(|\barea$/.test(s)) return 'superficie';
   if (/descrip|observa|notas/.test(s)) return 'descripcion';
   if (/mail/.test(s)) return 'p_email';
   return '';
@@ -74,8 +77,8 @@ export function adivina(header: string): Campo {
 
 /**
  * Cell values that are a header repeated, a placeholder or a "no data" word,
- * never a zone. Lowercase, single-spaced. Same list as `JUNK_ZONA` in the twin
- * file (see the header comment).
+ * never a zone. Lowercase, single-spaced. The list `JUNK_ZONA` of the landing
+ * repo mirrors (see the header comment).
  */
 export const JUNK = [
   'master project', 'masterproject', 'project', 'area', 'community', 'district',
@@ -103,6 +106,15 @@ export function limpiarZona(v: string): string {
   return esZonaValida(s) ? s : '';
 }
 
+/** A free-text cell that is not a zone but can still be a placeholder:
+ *  only-symbols and JUNK words are dropped, numerics are kept (a unit is
+ *  "2205"). Trimmed and single-spaced. */
+export function limpiarTexto(v: string): string {
+  const s = collapse(v);
+  if (!s || RE_ONLY_SYMBOLS.test(s) || JUNK.includes(s.toLowerCase())) return '';
+  return s;
+}
+
 /** The Master Project column, or the Area/Community one when that is junk. */
 export const municipioDe = (val: Accessor): string =>
   limpiarZona(val('municipio')) || limpiarZona(val('zona')) || '';
@@ -111,9 +123,11 @@ export const edificioDe = (val: Accessor): string => limpiarZona(val('edificio')
 
 export const proyectoDe = (val: Accessor): string => limpiarZona(val('proyecto'));
 
+export const unidadDe = (val: Accessor): string => limpiarTexto(val('unidad'));
+
 /** An explicit title, else project-or-zone · building · unit, junk left out. */
 export function tituloDe(val: Accessor): string {
-  const unidad = val('unidad');
+  const unidad = unidadDe(val);
   return val('titulo') || [
     proyectoDe(val) || municipioDe(val),
     edificioDe(val),
@@ -181,7 +195,7 @@ export function propiedadDe(val: Accessor): PropiedadImportada {
     municipio: municipioDe(val),
     proyecto: proyectoDe(val),
     edificio,
-    direccion: val('direccion') || [edificio, val('unidad')].filter(Boolean).join(', '),
+    direccion: val('direccion') || [edificio, unidadDe(val)].filter(Boolean).join(', '),
     descripcion: [val('descripcion'), contextoDe(val)].filter(Boolean).join(' — '),
   };
   const numeros = {
@@ -211,4 +225,21 @@ export function claveDuplicado(titulo: string): string {
   let i = 0;
   while (i < segmentos.length - 1 && !esZonaValida(segmentos[i])) i++;
   return segmentos.slice(i).join(' · ');
+}
+
+/**
+ * Every key a title answers to: `claveDuplicado` of the whole title and,
+ * when it has three or more segments (zone · building · unit), of the tail
+ * without the zone. A row imported under the old code as "- · Burj Vista 1 ·
+ * unidad 2205" and the same row now titled "Burj Khalifa · Burj Vista 1 ·
+ * unidad 2205" (the Area column supplies the zone) share the tail key —
+ * building plus unit IS the physical property. Two-segment titles have no
+ * tail: "unidad 2205" alone would make every 2205 in the city one flat.
+ */
+export function clavesDuplicado(titulo: string): string[] {
+  const completa = claveDuplicado(titulo);
+  const segmentos = titulo.split(' · ');
+  if (segmentos.length < 3) return [completa];
+  const cola = claveDuplicado(segmentos.slice(1).join(' · '));
+  return cola === completa ? [completa] : [completa, cola];
 }

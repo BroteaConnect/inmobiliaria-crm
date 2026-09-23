@@ -4,7 +4,7 @@ import {
   crearPropietario, crearPropiedad, crearLead, loadPropietarios, loadLeads, loadPropiedades,
 } from './api';
 import {
-  CAMPOS, adivina, claveDuplicado, contextoDe, criteriosDe, propiedadDe, tituloDe,
+  CAMPOS, adivina, clavesDuplicado, contextoDe, criteriosDe, propiedadDe, tituloDe,
   type Accessor,
 } from './import-mapping';
 
@@ -54,10 +54,13 @@ export default function Importar() {
       const propietarios = await loadPropietarios();
       const ownerId = new Map(propietarios.map((o) => [o.nombre.toLowerCase(), o.id]));
       const leadYaExiste = new Set((await loadLeads()).map((l) => l.nombre.toLowerCase()));
-      // Keyed by claveDuplicado on BOTH sides: a property imported before the
-      // junk rule ("- · Burj Vista 1 · unidad 2205") and the same row imported
-      // after it ("Burj Vista 1 · unidad 2205") are one property, not two.
-      const propYaExiste = new Set((await loadPropiedades()).map((p) => claveDuplicado(p.titulo)));
+      // Keyed by clavesDuplicado on BOTH sides: a property imported before the
+      // junk rule ("- · Burj Vista 1 · unidad 2205"), the same row imported
+      // after it ("Burj Vista 1 · unidad 2205") and the same row once the Area
+      // column supplies the zone ("Burj Khalifa · Burj Vista 1 · unidad 2205")
+      // are one property, not three — every title answers to its whole key
+      // and to its building · unit tail.
+      const propYaExiste = new Set((await loadPropiedades()).flatMap((p) => clavesDuplicado(p.titulo)));
 
       let nProps = 0, nOwners = 0, nLeads = 0, saltadas = 0;
       for (const row of rows.slice(1)) {
@@ -95,10 +98,10 @@ export default function Importar() {
             nOwners++;
           }
         }
-        const clave = claveDuplicado(titulo);
-        if (!titulo || propYaExiste.has(clave)) { saltadas++; continue; }
+        const claves = clavesDuplicado(titulo);
+        if (!titulo || claves.some((k) => propYaExiste.has(k))) { saltadas++; continue; }
         await crearPropiedad({ ...propiedadDe(val), propietario: owner || undefined });
-        propYaExiste.add(clave);
+        for (const k of claves) propYaExiste.add(k);
         nProps++;
       }
       setLog(t('imp.ok', { owners: nOwners, props: nProps, leads: nLeads })

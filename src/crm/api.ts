@@ -25,7 +25,8 @@ export type EstadoPropiedad = (typeof ESTADOS_PROPIEDAD)[number];
 
 export interface Propiedad {
   id: string; collectionId: string; titulo: string; direccion: string; municipio: string;
-  // Master project / building of a Dubai import (landing schema, optional).
+  // Master project / building of a Dubai import. Added to pb/schema.json by
+  // the landing repo; the CRM sends them only once that schema is applied.
   proyecto?: string; edificio?: string;
   precio: number; habitaciones: number; banos: number; superficie: number;
   descripcion: string; estado: EstadoPropiedad;

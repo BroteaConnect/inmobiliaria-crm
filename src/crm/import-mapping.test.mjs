@@ -1,13 +1,14 @@
 // Every assertion here is a way the importer fed the matcher junk, or would
 // the first time a Dubai export lands with a "-" in Master Project.
 //
-// The esZonaValida vector table is the SAME as in jobs/lib.test.mjs of the
-// landing repo (BroteaConnect/inmobiliaria): the two files gate the same rule.
+// The esZonaValida vector table is to be mirrored in jobs/lib.test.mjs of
+// the landing repo (BroteaConnect/inmobiliaria, landing PR of the same E5
+// phase): the two files gate the same rule.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CAMPOS, JUNK, adivina, claveDuplicado, criteriosDe, esZonaValida, limpiarZona,
-  municipioDe, numero, propiedadDe, superficieM2, tituloDe,
+  CAMPOS, JUNK, adivina, claveDuplicado, clavesDuplicado, criteriosDe, esZonaValida,
+  limpiarTexto, limpiarZona, municipioDe, numero, propiedadDe, superficieM2, tituloDe,
 } from './import-mapping';
 
 /** An Accessor over a header→value object, the way the loop builds one. */
@@ -27,6 +28,9 @@ test('adivina: the transaction-register headers land on their fields', () => {
     Community: 'zona',
     'Size (sq.ft)': 'superficie',
     'Property Size': 'superficie',
+    'Built-up Area': 'superficie',
+    'Plot Area': 'superficie',
+    'Carpet Area': 'superficie',
     ProjectNameEn: 'proyecto',
     UnitNumber: 'unidad',
     'Transaction Value': 'precio',
@@ -75,6 +79,17 @@ test('a junk master project is dropped: no municipio, a title without it', () =>
   assert.equal(tituloDe(fila({ municipio: 'N/A', edificio: 'Burj Vista 1' })), 'Burj Vista 1');
 });
 
+test('a junk unit is dropped from the title and the address, a numeric one is kept', () => {
+  const p = propiedadDe(fila({ municipio: 'Dubai Marina', edificio: 'Marina Gate 1', unidad: '-' }));
+  assert.equal(p.titulo, 'Dubai Marina · Marina Gate 1');
+  assert.equal(p.direccion, 'Marina Gate 1');
+  assert.equal(tituloDe(fila({ edificio: 'Marina Gate 1', unidad: 'N/A' })), 'Marina Gate 1');
+  assert.equal(tituloDe(fila({ edificio: 'Marina Gate 1', unidad: ' 2205 ' })), 'Marina Gate 1 · unidad 2205'); // lang-sweep: allow
+  assert.equal(limpiarTexto('2205'), '2205', 'a unit is a number: numerics survive');
+  assert.equal(limpiarTexto('—'), '');
+  assert.equal(limpiarTexto('tbd'), '');
+});
+
 test('the Area/Community column backs up a junk master project', () => {
   const val = fila({ municipio: '-', zona: 'Burj Khalifa', edificio: 'Burj Vista 1', unidad: '2205' });
   const p = propiedadDe(val);
@@ -114,6 +129,22 @@ test('claveDuplicado: a title imported with the junk equals the one imported wit
   // A title that is junk end to end still keys to something, never to ''.
   assert.equal(claveDuplicado('-'), '-');
   assert.equal(claveDuplicado('Piso en Chamberí'), 'piso en chamberí'); // lang-sweep: allow
+});
+
+test('clavesDuplicado: a zone that appears between two imports does not double the row', () => {
+  const existentes = new Set(clavesDuplicado('- · Burj Vista 1 · unidad 2205')); // lang-sweep: allow
+  const nueva = clavesDuplicado('Burj Khalifa · Burj Vista 1 · unidad 2205'); // lang-sweep: allow
+  assert.deepEqual(nueva, ['burj khalifa · burj vista 1 · unidad 2205', 'burj vista 1 · unidad 2205']); // lang-sweep: allow
+  assert.ok(nueva.some((k) => existentes.has(k)), 'the building · unit tail is the shared key');
+  // And the other way round: the zoned row exists, the CSV without an Area column comes back.
+  const zonadas = new Set(clavesDuplicado('Burj Khalifa · Burj Vista 1 · unidad 2205')); // lang-sweep: allow
+  assert.ok(clavesDuplicado('Burj Vista 1 · unidad 2205').some((k) => zonadas.has(k))); // lang-sweep: allow
+  // Two segments have no tail: unit 1413 in two buildings is two flats.
+  assert.deepEqual(clavesDuplicado('Marina Gate 1 · unidad 1413'), ['marina gate 1 · unidad 1413']); // lang-sweep: allow
+  const otra = new Set(clavesDuplicado('Marina Gate 2 · unidad 1413')); // lang-sweep: allow
+  assert.ok(!clavesDuplicado('Marina Gate 1 · unidad 1413').some((k) => otra.has(k))); // lang-sweep: allow
+  // A one-segment title answers to itself only.
+  assert.deepEqual(clavesDuplicado('Piso en Chamberí'), ['piso en chamberí']); // lang-sweep: allow
 });
 
 test('numero and superficieM2 are unchanged', () => {
