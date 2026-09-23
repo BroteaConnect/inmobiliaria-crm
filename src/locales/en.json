@@ -111,6 +111,7 @@
   "campo.t_proc": "Transaction · procedure",
   "campo.titulo": "Property · title",
   "campo.unidad": "Property · unit/no.",
+  "campo.zona": "Property · area/community",
   "canal.email": "✉️ Email",
   "canal.llamada": "📞 Call",
   "canal.nota": "📝 Note",

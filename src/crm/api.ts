@@ -25,6 +25,8 @@ export type EstadoPropiedad = (typeof ESTADOS_PROPIEDAD)[number];
 
 export interface Propiedad {
   id: string; collectionId: string; titulo: string; direccion: string; municipio: string;
+  // Master project / building of a Dubai import (landing schema, optional).
+  proyecto?: string; edificio?: string;
   precio: number; habitaciones: number; banos: number; superficie: number;
   descripcion: string; estado: EstadoPropiedad;
   fotos: string[]; propietario: string;
