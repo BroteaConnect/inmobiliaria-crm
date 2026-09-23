@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
+import { signOutAndAnnounce } from '../lib/auth';
 import { SidePanel } from '../components/kit/SidePanel';
 import { EditSheet } from '../components/kit/EditSheet';
 import { Dialog, Select, useToast } from '../components/ui';
@@ -10,7 +11,7 @@ import { EnviarPlantilla } from './EnviarPlantilla';
 import {
   ETAPAS, etiquetaCanal, etiquetaEnvio, type Actividad, type Envio, type Etapa, type Lead, type Plantilla,
   type Propiedad, type Usuario, type Visita, anotar, asignarLead, coincideLead, crearLead, desatendido,
-  enviarEmail, haceCuanto, loadActividades, loadEnviosDeLead, loadLeads, loadPlantillas, loadPropiedades,
+  enviarEmail, esSesionCaducada, haceCuanto, loadActividades, loadEnviosDeLead, loadLeads, loadPlantillas, loadPropiedades,
   loadUsuarios, loadVisitasDeLead, moverLead, onLeadsChange, porPrioridad, registrarContacto, setPrioridad, waLink,
 } from './api';
 
@@ -230,17 +231,24 @@ export default function Kanban() {
     await abrirFicha(lead);
   };
   const [enviando, setEnviando] = useState(false);
+  // An expired session is not a send that failed. The chassis refuses the
+  // agent's PocketBase token with a 401 and says so in its own Spanish; the
+  // app says it in the agent's language and offers the only thing that helps.
+  const [caducada, setCaducada] = useState(false);
   const mandarEmail = async () => {
     if (!email) return;
     setEnviando(true);
     setEmailError(null);
+    setCaducada(false);
     try {
       await enviarEmail(email.lead, email.asunto, email.texto, locale);
       toast({ title: t('email.enviado', { nombre: email.lead.nombre }), tone: 'ok' });
       recargar();
       await cerrarEmail();
     } catch (err) {
-      const msg = t('email.error', { error: (err as Error).message });
+      const expirada = esSesionCaducada(err);
+      const msg = expirada ? t('chasis.sesionCaducada') : t('email.error', { error: (err as Error).message });
+      setCaducada(expirada);
       setEmailError(msg);
       toast({ title: msg, tone: 'error' });
     } finally {
@@ -274,9 +282,18 @@ export default function Kanban() {
           footer={(
             <>
               <button className="kit-btn kit-btn-ghost" onClick={cerrarEmail} disabled={enviando}>{t('email.cancelar')}</button>
-              <button className="kit-btn kit-btn-primary" onClick={mandarEmail} disabled={enviando || !email.asunto || !email.texto}>
-                {enviando ? t('email.enviando') : t('email.enviar')}
-              </button>
+              {/* Nothing is retriable on a session that is over: the primary
+                  becomes the way back in. The reload is what reopens the gate,
+                  because nothing here listens for the sign-out event. */}
+              {caducada ? (
+                <button className="kit-btn kit-btn-primary" onClick={() => { signOutAndAnnounce(); location.reload(); }}>
+                  {t('chasis.volverAEntrar')}
+                </button>
+              ) : (
+                <button className="kit-btn kit-btn-primary" onClick={mandarEmail} disabled={enviando || !email.asunto || !email.texto}>
+                  {enviando ? t('email.enviando') : t('email.enviar')}
+                </button>
+              )}
             </>
           )}
         >

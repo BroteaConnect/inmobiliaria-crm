@@ -4,8 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  EMPTY_PLANTILLA, WINDOW_MS, contentEstadoDe, esDirty, faltantes, fieldsOf, payloadOf, placeholdersOf,
-  render, reparoDe, validate, variablesDeLead, ventanaAbierta,
+  EMPTY_PLANTILLA, WINDOW_MS, congelados, contentAprobado, contentEstadoDe, esDirty, faltantes, fieldsOf,
+  payloadOf, placeholdersOf, render, reparoDe, validate, variablesDeLead, ventanaAbierta, viaPrevista,
 } from './plantilla-form';
 
 const ok = {
@@ -200,4 +200,41 @@ test('an email template only answers to its own lifecycle, and a draft is a warn
   assert.equal(reparoDe({ canal: 'email', estado: 'borrador' }, 'es', false).nivel, 'aviso');
   assert.deepEqual(reparoDe({ canal: 'whatsapp', estado: 'borrador', content_estado: 'approved' }, 'es', false),
     { nivel: 'aviso', code: 'borrador', estado: 'borrador' });
+});
+
+// --- what Meta holds, and what the CRM may still change -----------------------
+// The day a template is approved, the row stops being the text the client
+// reads. Everything below is that day.
+
+test('a Content is approved when either language is, and never off WhatsApp', () => {
+  assert.equal(contentAprobado({ canal: 'whatsapp', content_estado: 'approved' }), true);
+  assert.equal(contentAprobado({ canal: 'whatsapp', content_estado_en: 'approved' }), true);
+  assert.equal(contentAprobado({ canal: 'whatsapp', content_estado: 'pending' }), false);
+  assert.equal(contentAprobado({ canal: 'whatsapp' }), false);
+  // An email template has no Content at all: nothing about it is frozen.
+  assert.equal(contentAprobado({ canal: 'email', content_estado: 'approved' }), false);
+});
+
+test('the frozen fields are the two bodies and the variable list, order included', () => {
+  const actual = fieldsOf({ ...ok });
+  assert.deepEqual(congelados({ ...actual }, actual), []);
+  // A name the agent could no longer send: the chassis maps values onto
+  // {{1}} {{2}} {{3}} in THIS order, so removing one moves every later value.
+  assert.deepEqual(congelados({ ...actual, variables: ['nombre', 'fecha'] }, actual), ['variables']);
+  // Reordering changes nothing visible in the CRM and everything on the phone.
+  assert.deepEqual(congelados({ ...actual, variables: ['propiedad', 'nombre', 'fecha'] }, actual), ['variables']);
+  assert.deepEqual(congelados({ ...actual, cuerpo_es: 'otra cosa {{nombre}}' }, actual), ['cuerpo_es']); // lang-sweep: allow
+  assert.deepEqual(congelados({ ...actual, cuerpo_en: 'something else {{nombre}}' }, actual), ['cuerpo_en']);
+  // The name, the category and the lifecycle are not Meta's business.
+  assert.deepEqual(congelados({ ...actual, nombre: 'Otro', estado: 'retirada', categoria: 'marketing' }, actual), []);
+});
+
+test('which text actually reaches the lead', () => {
+  // Outside the window WhatsApp only carries the Content Meta approved, and
+  // the CRM does not hold that text: the preview may not promise it.
+  assert.equal(viaPrevista('whatsapp', false), 'content');
+  // Inside it the chassis renders the row's own body, which IS the preview.
+  assert.equal(viaPrevista('whatsapp', true), 'free_text');
+  assert.equal(viaPrevista('email', false), 'email');
+  assert.equal(viaPrevista('email', true), 'email');
 });

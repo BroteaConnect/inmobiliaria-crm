@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { useSettings } from '../lib/SettingsContext';
 import { monedaDe } from '../lib/settings';
-import { currentUser } from '../lib/auth';
+import { currentUser, signOutAndAnnounce } from '../lib/auth';
 import { Dialog, Select, useToast } from '../components/ui';
 import {
-  type Actividad, type CanalMensaje, type Idioma, type Lead, type Plantilla, enviarPlantilla,
+  type Actividad, type CanalMensaje, type Idioma, type Lead, type Plantilla, enviarPlantilla, esSesionCaducada,
 } from './api';
-import { faltantes, fieldsOf, render, reparoDe, variablesDeLead, ventanaAbierta } from './plantilla-form';
+import { faltantes, fieldsOf, render, reparoDe, variablesDeLead, ventanaAbierta, viaPrevista } from './plantilla-form';
 import './plantillas.css';
 
 // "Enviar plantilla" on the lead card: which channel, which template, with
@@ -29,6 +29,14 @@ import './plantillas.css';
 // first: a retired template is refused before the round trip, a WhatsApp
 // template Twilio has not approved can only go out while the lead's 24-hour
 // window is open, and a draft going to a client is worth a word.
+//
+// The preview promises only what it can keep. Outside the 24-hour window a
+// WhatsApp template leaves as the Content Meta approved, and that text lives
+// at Meta, not in the row: the CRM cannot show it and must not pretend the
+// row's current body is it. So for that one route the preview stops being
+// titled "what they will receive" and says what actually happens, values
+// included. What keeps the two texts from diverging in the first place is the
+// editor, which freezes an approved row (plantilla-form.ts `contentAprobado`).
 
 export function EnviarPlantilla({ lead, actividades, plantillas, onClose, onSent }: {
   lead: Lead;
@@ -50,10 +58,13 @@ export function EnviarPlantilla({ lead, actividades, plantillas, onClose, onSent
   const [plantillaId, setPlantillaId] = useState('');
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [caducada, setCaducada] = useState(false);
   const [enviando, setEnviando] = useState(false);
 
   const idioma: Idioma = lead.idioma === 'en' ? 'en' : 'es';
   const ventana = useMemo(() => ventanaAbierta(actividades), [actividades]);
+  /** `content` is the route whose text the CRM does not hold (see the note above). */
+  const via = viaPrevista(canal, ventana);
   const disponibles = plantillas.filter((p) => p.canal === canal);
   const plantilla = disponibles.find((p) => p.id === plantillaId) ?? null;
   const reparo = plantilla ? reparoDe(plantilla, idioma, ventana) : null;
@@ -117,6 +128,7 @@ export function EnviarPlantilla({ lead, actividades, plantillas, onClose, onSent
     if (falta.length) { setError(t('plantillas.enviar.faltaVariable', { nombre: falta[0] })); return; }
     setEnviando(true);
     setError(null);
+    setCaducada(false);
     try {
       const r = await enviarPlantilla(canal, { lead_id: lead.id, plantilla: plantilla.clave, variables: valores }, locale);
       // `via` is the chassis's word (free_text, content); named in the locale
@@ -132,7 +144,11 @@ export function EnviarPlantilla({ lead, actividades, plantillas, onClose, onSent
     } catch (e) {
       // Said inside the dialog too: an open modal hides the toast from
       // assistive technology, and the form is kept so the agent can retry.
-      const msg = t('plantillas.enviar.error', { error: (e as Error).message });
+      // An expired session is not a send that failed: it is said in the app's
+      // own words and answered with the way back in, not with "retry".
+      const caducada = esSesionCaducada(e);
+      const msg = caducada ? t('chasis.sesionCaducada') : t('plantillas.enviar.error', { error: (e as Error).message });
+      setCaducada(caducada);
       setError(msg);
       toast({ title: msg, tone: 'error' });
     } finally {
@@ -156,7 +172,19 @@ export function EnviarPlantilla({ lead, actividades, plantillas, onClose, onSent
               form says what is missing when it is asked to send. A lead with
               neither phone nor email has no send at all, which is a different
               thing from a send that is not ready. */}
-          {canales.length > 0 && (
+          {/* A send cannot be retried on a session that is over: the primary
+              becomes the way back in, and the reload is what reopens the gate
+              (nothing in this app listens for the sign-out event). */}
+          {canales.length > 0 && caducada && (
+            <button
+              type="button"
+              className="kit-btn kit-btn-primary"
+              onClick={() => { signOutAndAnnounce(); location.reload(); }}
+            >
+              {t('chasis.volverAEntrar')}
+            </button>
+          )}
+          {canales.length > 0 && !caducada && (
             <button type="submit" form="enviar-plantilla" className="kit-btn kit-btn-primary" disabled={enviando}>
               {enviando ? t('plantillas.enviar.enviando') : t('plantillas.enviar.enviar')}
             </button>
@@ -216,7 +244,11 @@ export function EnviarPlantilla({ lead, actividades, plantillas, onClose, onSent
 
         {plantilla && (
           <div className="campo">
-            <span>{t('plantillas.enviar.vistaPrevia', { idioma: t(`plantillas.idioma.${idioma}`) })}</span>
+            <span>
+              {t(via === 'content' ? 'plantillas.enviar.vistaPreviaContent' : 'plantillas.enviar.vistaPrevia',
+                { idioma: t(`plantillas.idioma.${idioma}`) })}
+            </span>
+            {via === 'content' && <p className="pista">{t('plantillas.enviar.avisoContent')}</p>}
             <div className="plantilla-preview">
               {asunto && <strong>{render(asunto, valores)}</strong>}
               <p>{render(cuerpo, valores)}</p>

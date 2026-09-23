@@ -1,6 +1,6 @@
 import { fmtMoney, intlOf, t } from '../lib/i18n';
 // api.ts — typed helpers over the factory's PocketBase client for this CRM.
-import { list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
+import { authToken, list, listAll, create, update, fileUrl, subscribe } from '../lib/pb';
 import { currentUser } from '../lib/auth';
 import { madridTodayFilter } from '../lib/madrid-day';
 import { listUsersOrSelf } from '../lib/users';
@@ -339,9 +339,18 @@ export const onVisitasChange = (cb: () => void) => subscribe(['visitas/*'], cb);
 // chassis, which holds the provider credentials and writes the activity and
 // the `envios` row. There is exactly one send path in this app — the one
 // `enviarEmail` has always used — and this block widens it rather than
-// opening a second one: same host, same secret, same "the CRM never guesses a
-// success" rule. A non-2xx, or a 200 carrying `ok: false`, is a ChassisError
-// with the sentence the chassis chose.
+// opening a second one: same host, same credential, same "the CRM never
+// guesses a success" rule. A non-2xx, or a 200 carrying `ok: false`, is a
+// ChassisError with the sentence the chassis chose.
+//
+// The credential is the signed-in agent's own PocketBase token, and it is the
+// only one this app may hold. The shared OUTBOUND_SECRET used to travel here
+// as `?secret=`: a static bundle has no private storage, so every reader of
+// `/assets/index-*.js` held a key to the chassis. It is gone from the source,
+// from the Dockerfile and from the build, and the chassis now refuses a
+// browser-shaped request that carries it (`403 secret_from_browser`).
+// The host callers — brotea-whatsapp, jobs/*.mjs, the estate gates — keep the
+// secret, because a server can keep one.
 
 const CHASSIS_URL = 'https://api.brotea.dev';
 
@@ -376,15 +385,29 @@ function textoDeChasis(detail: unknown, status: number): string {
   return `HTTP ${status}`;
 }
 
+/**
+ * A 401 is not a send that failed: it is a session that is over. The chassis
+ * says so in Spanish whatever the agent's language, and its sentence names a
+ * token the agent never typed, so the app says it in its own words — and the
+ * two dialogs that send offer the way back in (`esSesionCaducada`).
+ */
+export const esSesionCaducada = (e: unknown): boolean =>
+  e instanceof ChassisError && e.status === 401;
+
+/** One authenticated POST to the chassis, with the failure shape unchanged. */
 async function chassis<T extends { ok?: boolean }>(path: ChassisPath, body: object, locale: string): Promise<T> {
-  const secret = import.meta.env.PUBLIC_OUTBOUND_SECRET as string | undefined;
-  if (!secret) throw new Error(t(locale, 'chasis.sinConfigurar'));
-  const res = await fetch(`${CHASSIS_URL}${path}?secret=${encodeURIComponent(secret)}`, {
+  const token = authToken();
+  if (!token) throw new ChassisError(t(locale, 'chasis.sesionCaducada'), 401);
+  const res = await fetch(`${CHASSIS_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({})) as T;
+  if (res.status === 401) throw new ChassisError(t(locale, 'chasis.sesionCaducada'), 401, json);
   if (!res.ok) throw new ChassisError(textoDeChasis(json, res.status), res.status, json);
   if (json && json.ok === false) throw new ChassisError(textoDeChasis(json, res.status), res.status, json);
   return json;
@@ -481,27 +504,17 @@ export async function normalizaFoto(f: File, locale = 'es'): Promise<File> {
 
 // El envío real lo hace el chasis (las credenciales SMTP nunca llegan al
 // navegador); aquí solo pedimos el envío y él registra la actividad.
-const OUTBOUND_URL = `${CHASSIS_URL}/send-email`;
-
-// `locale` because the one failure that is the app's own — no secret in this
-// build — is shown to the agent, and it was the last Spanish sentence the
-// English UI printed.
+//
+// The recipient is NOT sent: the chassis reads the address off the `leads` row
+// this names, and refuses a request that only carries a `to` (`400
+// lead_required`). An arbitrary recipient plus a published credential was an
+// open relay over the agency's own SMTP identity.
 export async function enviarEmail(lead: Lead, asunto: string, texto: string, locale = 'es') {
-  const secret = import.meta.env.PUBLIC_OUTBOUND_SECRET as string | undefined;
-  if (!secret) throw new Error(t(locale, 'chasis.sinConfigurar'));
-  const res = await fetch(`${OUTBOUND_URL}?secret=${encodeURIComponent(secret)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: lead.email, subject: asunto, text: texto,
-      lead_id: lead.id, from_name: 'Inmobiliaria',
-    }),
-  });
-  if (!res.ok) {
-    const detalle = await res.json().catch(() => ({}));
-    throw new Error(detalle.detail || detalle.error || `error ${res.status}`);
-  }
-  return res.json() as Promise<{ message_id: string; activity_id: string | null }>;
+  return chassis<{ ok?: boolean; message_id: string; activity_id: string | null }>(
+    '/send-email',
+    { lead_id: lead.id, subject: asunto, text: texto, from_name: 'Inmobiliaria' },
+    locale,
+  );
 }
 
 export const waLink = (l: Lead) => {

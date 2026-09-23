@@ -253,6 +253,47 @@ export function contentEstadoDe(p: ParaEnviar, idioma: 'es' | 'en'): string {
   return p.content_estado || 'unsubmitted';
 }
 
+/**
+ * Is this row's text frozen at Meta's end?
+ *
+ * Once Meta has APPROVED a Content, Twilio sends that Content and nothing
+ * else: the body the CRM holds is no longer what the client reads, and the
+ * `variables` array is worse than stale — it is the positional key. The
+ * chassis maps values onto the approved `{{1}} {{2}} {{3}}` in the order of
+ * THIS array (requirements-api/src/templates.js `positional`), so a name
+ * added, removed or reordered after approval puts the date where the property
+ * should be, silently, on a message that has already left.
+ *
+ * Neither drift is detectable from a row: the approved text lives at Meta and
+ * the version it was approved at is encoded in the Content's `friendly_name`,
+ * which no chassis endpoint returns to the CRM and no column stores. So the
+ * CRM does not detect the drift, it refuses to create it: while a Content is
+ * approved the two bodies and the variable list are read only here, and the
+ * send dialog says that what leaves is the approved text.
+ */
+export const contentAprobado = (p: Pick<Plantilla, 'canal' | 'content_estado' | 'content_estado_en'>): boolean =>
+  p.canal === 'whatsapp' && (p.content_estado === 'approved' || p.content_estado_en === 'approved');
+
+/** The frozen fields this edit would change, empty when the save is safe. */
+export function congelados(f: PlantillaFields, actual: PlantillaFields): string[] {
+  const out: string[] = [];
+  if (f.cuerpo_es !== actual.cuerpo_es) out.push('cuerpo_es');
+  if (f.cuerpo_en !== actual.cuerpo_en) out.push('cuerpo_en');
+  if (f.variables.join('\n') !== actual.variables.join('\n')) out.push('variables');
+  return out;
+}
+
+/**
+ * Which text will actually reach the lead.
+ *
+ * `content` is the one that is not what the preview shows: outside Meta's
+ * 24-hour window a WhatsApp template can only leave as the Content Meta
+ * approved. Inside the window the chassis renders the row's own body
+ * (`free_text`), and email always renders the row.
+ */
+export const viaPrevista = (canal: 'email' | 'whatsapp', ventana: boolean): 'email' | 'free_text' | 'content' =>
+  (canal !== 'whatsapp' ? 'email' : ventana ? 'free_text' : 'content');
+
 /** The one thing worth saying about this send before the agent presses Enviar. */
 export function reparoDe(p: ParaEnviar, idioma: 'es' | 'en', ventana: boolean): Reparo {
   if (p.estado === 'retirada') return { nivel: 'bloqueo', code: 'retirada' };

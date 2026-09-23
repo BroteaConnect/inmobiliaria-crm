@@ -10,6 +10,11 @@ COPY . .
 # PUBLIC_* vars are inlined into the bundle at build time. The composer
 # wires one ARG/ENV pair per feature right below this anchor; the deploy
 # skill supplies the values as Coolify build args.
+#
+# Nothing secret may be listed here, ever: whatever is inlined is served to
+# anyone who fetches /assets/index-*.js. PUBLIC_OUTBOUND_SECRET was, and the
+# CRM now authenticates to the chassis with the signed-in agent's own
+# PocketBase token instead (src/crm/api.ts).
 # brotea:build-args
 ARG PUBLIC_SUPABASE_ANON_KEY
 ENV PUBLIC_SUPABASE_ANON_KEY=$PUBLIC_SUPABASE_ANON_KEY
@@ -17,8 +22,6 @@ ARG PUBLIC_SUPABASE_URL
 ENV PUBLIC_SUPABASE_URL=$PUBLIC_SUPABASE_URL
 ARG PUBLIC_BUILD_COMMIT
 ENV PUBLIC_BUILD_COMMIT=$PUBLIC_BUILD_COMMIT
-ARG PUBLIC_OUTBOUND_SECRET=""
-ENV PUBLIC_OUTBOUND_SECRET=$PUBLIC_OUTBOUND_SECRET
 ARG PUBLIC_PB_URL
 ENV PUBLIC_PB_URL=$PUBLIC_PB_URL
 ARG PUBLIC_GLITCHTIP_DSN
