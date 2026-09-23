@@ -87,6 +87,7 @@ export default function Kanban() {
     if ((l.asignado ?? '') === userId) return;
     try {
       await asignarLead(l.id, userId || null);
+      setFichaError(null);
       recargar();
     } catch (e) {
       const msg = t('lead.asignadoError', { nombre: l.nombre, error: (e as Error).message });
@@ -365,6 +366,7 @@ export default function Kanban() {
               // (vacío) y no con el del último lead abierto.
               if (creado?.id) {
                 setHistorial([]);
+                setVisitas([]);
                 abrir(creado.id);
                 cargarHistorial(creado.id);
               }

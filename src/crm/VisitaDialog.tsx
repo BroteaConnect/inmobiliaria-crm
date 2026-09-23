@@ -52,7 +52,19 @@ export function VisitaDialog({ lead, leads, onClose, onCreated }: {
     loadPropiedades().then((ps) => { if (alive) setPropiedades(ps.filter((p) => p.estado === 'publicada')); }).catch(() => {});
     // Never throws: a closed users rule answers the signed-in agent alone.
     loadUsuarios().then((us) => { if (alive) setUsuarios(us); });
-    if (!lead && !leads) loadLeads().then((ls) => { if (alive) setCandidatos(ls); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // The leads to search follow the caller's list while the dialog is open
+  // (the queue reloads on every realtime event), and an EMPTY list is not a
+  // list: the caller may still be loading or may have failed, and a search
+  // that can only answer "no lead matches" is a dead end. Then they are
+  // loaded here.
+  useEffect(() => {
+    if (lead) return;
+    if (leads?.length) { setCandidatos(leads); return; }
+    let alive = true;
+    loadLeads().then((ls) => { if (alive) setCandidatos(ls); }).catch(() => {});
     return () => { alive = false; };
   }, [lead, leads]);
 
@@ -62,9 +74,15 @@ export function VisitaDialog({ lead, leads, onClose, onCreated }: {
   ];
   // The lead's own property may be a draft; it is still the flat they asked
   // about, so it stays selectable rather than silently dropping to "none".
-  if (propiedad && !propiedades.some((p) => p.id === propiedad) && elegido?.expand?.propiedad?.id === propiedad) {
+  // A property that neither the list nor the lead can name any more (deleted
+  // since the lead asked) is a dangling id the server would refuse: it is
+  // dropped to "none" before it can be submitted.
+  const propiedadConocida = propiedades.some((p) => p.id === propiedad);
+  if (propiedad && !propiedadConocida && elegido?.expand?.propiedad?.id === propiedad) {
     opcionesPropiedad.push({ value: propiedad, label: elegido.expand.propiedad.titulo });
   }
+  const propiedadValida = !propiedad || propiedadConocida || elegido?.expand?.propiedad?.id === propiedad
+    ? propiedad : '';
   const opcionesAgente = [
     { value: '', label: t('visitas.sinAgente') },
     ...usuarios.map((u) => ({ value: u.id, label: u.name || u.email || u.id })),
@@ -101,7 +119,7 @@ export function VisitaDialog({ lead, leads, onClose, onCreated }: {
     try {
       const creada = await crearVisita({
         lead: elegido.id,
-        propiedad: propiedad || undefined,
+        propiedad: propiedadValida || undefined,
         agente: agenteValido || undefined,
         cuando: instante.toISOString(),
         notas: notas.trim() || undefined,
@@ -189,7 +207,7 @@ export function VisitaDialog({ lead, leads, onClose, onCreated }: {
           <span>{t('visitas.campo.propiedad')}</span>
           <Select
             key={claveDe(opcionesPropiedad)}
-            value={propiedad}
+            value={propiedadValida}
             onValueChange={setPropiedad}
             ariaLabel={t('visitas.campo.propiedad')}
             options={opcionesPropiedad}

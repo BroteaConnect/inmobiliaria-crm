@@ -74,21 +74,23 @@ export default function Today() {
   useEffect(() => onVisitasChange(recargarVisitas), []);
 
   // The outcome is set on the row, where the visit is read. One write at a
-  // time per visit: a second press on a slow link must not race the first.
-  const [escribiendo, setEscribiendo] = useState<string | null>(null);
+  // time PER VISIT, never one for the whole list: a second press on a slow
+  // link must not race the first, and row B must not go dead while row A
+  // is still saving. Only the row in flight has its control disabled.
+  const [escribiendo, setEscribiendo] = useState<Set<string>>(() => new Set());
   const cambiarResultado = async (v: Visita, resultado: VisitaResultado) => {
-    if (v.resultado === resultado || escribiendo) return;
-    setEscribiendo(v.id);
+    if (v.resultado === resultado || escribiendo.has(v.id)) return;
+    setEscribiendo((s) => new Set(s).add(v.id));
     const nombre = v.expand?.lead?.nombre ?? '';
     try {
       await actualizarVisita(v.id, { resultado });
-      // Painted at once; the realtime event confirms it a moment later.
+      // Painted once the server has it; the realtime event agrees a moment later.
       setVisitas((vs) => vs.map((x) => (x.id === v.id ? { ...x, resultado } : x)));
       toast({ tone: 'ok', title: t('visitas.resultadoCambiado', { nombre, resultado: t(`visitas.resultado.${resultado}`) }) });
     } catch (e) {
       toast({ tone: 'error', title: t('visitas.resultadoError', { error: (e as Error).message }) });
     } finally {
-      setEscribiendo(null);
+      setEscribiendo((s) => { const n = new Set(s); n.delete(v.id); return n; });
     }
   };
   const opcionesResultado = VISITA_RESULTADOS.map((r) => ({ value: r, label: t(`visitas.resultado.${r}`) }));
@@ -171,7 +173,7 @@ export default function Today() {
                   value={resultado}
                   onValueChange={(r) => cambiarResultado(v, r as VisitaResultado)}
                   ariaLabel={t('visitas.resultadoAria', { nombre })}
-                  disabled={escribiendo === v.id}
+                  disabled={escribiendo.has(v.id)}
                   options={opcionesResultado}
                 />
               )}
