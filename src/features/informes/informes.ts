@@ -3,11 +3,13 @@
 // Sin React y sin PocketBase, para que `node --test` pueda comprobarlos — que en
 // un informe es donde más importa: una cifra mal calculada no falla, se publica.
 //
-// Solo se calcula lo que estas filas pueden saber. El diseño dibuja además
-// visitas realizadas, comisión, tasa de no-show y rendimiento por agente: no hay
-// colección de visitas, ni campo de comisión, ni asignación de agente, así que no
-// aparecen. Un panel que enseña una cifra que no puede conocer es peor que un
-// panel con menos cifras.
+// Only what these rows can know is computed. The design also draws visits
+// done, commission, no-show rate and per-agent performance. The `visitas`
+// collection and `leads.asignado` exist since E4 (src/crm/api.ts), but this
+// report still reads leads and activities only, and there is no commission
+// field: those figures wait for a report that reads the visits, rather than
+// being painted as zeros. A panel showing a figure it cannot know is worse
+// than a panel with fewer figures.
 import type { Actividad, Lead } from '../../crm/api';
 
 /** PocketBase manda "2026-08-15 09:14:00Z"; Date quiere la T. */

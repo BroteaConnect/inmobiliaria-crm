@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { madridDayBounds, madridMidnight, madridTodayFilter, pbDateLiteral } from './madrid-day';
+import {
+  instantOfMadridWall, madridDayBounds, madridMidnight, madridTodayFilter, madridWallOf, nextMadridSlot, pbDateLiteral,
+} from './madrid-day';
 
 const iso = (d) => d.toISOString();
 const at = (s) => new Date(s);
@@ -68,4 +70,37 @@ test('the filter uses the PocketBase literal, space-separated and with millis', 
     madridTodayFilter('cuando', at('2026-06-11T09:00:00Z')),
     'cuando >= "2026-06-10 22:00:00.000Z" && cuando < "2026-06-11 22:00:00.000Z"',
   );
+});
+
+// -- the datetime-local bridge ---------------------------------------------------
+
+test('a Madrid wall clock becomes the right instant in summer and in winter', () => {
+  assert.equal(iso(instantOfMadridWall('2026-07-01T10:30')), '2026-07-01T08:30:00.000Z');
+  assert.equal(iso(instantOfMadridWall('2026-01-15T10:30')), '2026-01-15T09:30:00.000Z');
+  // Just after midnight in Madrid is still the previous date in UTC.
+  assert.equal(iso(instantOfMadridWall('2026-07-01T00:15')), '2026-06-30T22:15:00.000Z');
+});
+
+test('the same wall clock comes back from the instant, whatever zone the machine is in', () => {
+  for (const wall of ['2026-07-01T10:30', '2026-01-15T10:30', '2026-07-01T00:15', '2026-03-29T03:30', '2026-10-25T12:00']) {
+    assert.equal(madridWallOf(instantOfMadridWall(wall)), wall);
+  }
+});
+
+test('on the spring-forward night 03:30 is one hour after 01:30, not two', () => {
+  const before = instantOfMadridWall('2026-03-29T01:30');
+  const after = instantOfMadridWall('2026-03-29T03:30');
+  assert.equal((after - before) / 3600000, 1);
+});
+
+test('a malformed or impossible field value is null, never an Invalid Date', () => {
+  for (const bad of ['', '2026-07-01', '2026-13-01T10:00', '2026-07-32T10:00', '2026-07-01T24:00', 'yesterday']) {
+    assert.equal(instantOfMadridWall(bad), null, bad);
+  }
+});
+
+test('the next slot rounds up to the following half hour on the Madrid clock', () => {
+  assert.equal(nextMadridSlot(at('2026-07-01T08:05:00Z')), '2026-07-01T10:30');
+  assert.equal(nextMadridSlot(at('2026-07-01T08:30:00Z')), '2026-07-01T11:00', 'exactly on a slot moves to the next one');
+  assert.equal(nextMadridSlot(at('2026-07-01T21:45:00Z')), '2026-07-02T00:00', 'the day rolls over on the Madrid clock');
 });

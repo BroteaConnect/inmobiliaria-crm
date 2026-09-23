@@ -5,6 +5,20 @@
    one voice instead of three. */
 .today h1 { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 var(--space-4); }
 .today-kpis { display: flex; gap: var(--space-6); flex-wrap: wrap; }
+/* Two sections on one screen, both named the way the panel names its blocks:
+   a small caption, not a second title competing with "Hoy". */
+.today h2 { font-family: var(--font-sans); font-size: .82rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); margin: 0; }
+.today h2 .n { color: var(--primary); font-variant-numeric: tabular-nums; margin-inline-start: 2px; }
+.today-cola { margin: var(--space-5) 0 var(--space-3); }
+.today-visitas { margin-top: var(--space-4); }
+.today-visitas-head { display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); margin-bottom: var(--space-3); }
+/* The time is the row's signal: bold, tabular, next to the outcome chip. */
+.today .kit-card-signal { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.visita-hora { font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The outcome control needs a width its options cannot promise. */
+.today .visita-resultado { min-width: 10.5rem; }
 .today-status { color: var(--muted); font-size: .85rem; padding: var(--space-3) 0; }
 .today-clear { font-size: 1rem; color: var(--text); }
 .today-foot { color: var(--muted); font-size: .78rem; margin-top: var(--space-5); }
@@ -15,4 +29,5 @@
   /* The card keeps its anatomy on a phone; only the actions drop below it. */
   .kit-card { flex-direction: column; align-items: stretch; }
   .kit-card-actions { justify-content: flex-end; }
+  .today .visita-resultado { flex: 1 1 auto; }
 }

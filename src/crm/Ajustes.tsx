@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n } from '../lib/LocaleContext';
 import { useSettings } from '../lib/SettingsContext';
 import {
   NEGOCIO_REQUERIDO, adapterOf, moduleEnabled, negocioPendiente, textOf, type SettingValue,
 } from '../lib/settings';
 import { Button, Chip, Toggle } from '../components/kit';
+import { Select } from '../components/ui';
+import { loadUsuarios, type Usuario } from './api';
 import './ajustes.css';
 
 // The configuration screen: which modules this CRM shows, and whether each
@@ -40,6 +42,17 @@ export default function Ajustes() {
   const { settings, ready, remote, save } = useSettings();
   const [failed, setFailed] = useState<string | null>(null);
   const pendientes = negocioPendiente(settings);
+  // The agents a web lead can land on. Never an error: a closed users rule
+  // answers the signed-in agent alone (src/lib/users.ts).
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  useEffect(() => { loadUsuarios().then(setUsuarios); }, []);
+  const guardia = textOf(settings, 'agentes.guardia');
+  const opcionesGuardia = [
+    { value: '', label: t('ajustes.agentes.nadie') },
+    ...usuarios.map((u) => ({ value: u.id, label: u.name || u.email || u.id })),
+  ];
+  // A stored id the directory does not list is kept and named, not dropped.
+  if (guardia && !usuarios.some((u) => u.id === guardia)) opcionesGuardia.push({ value: guardia, label: t('lead.asignadoOtro') });
 
   const write = async (key: string, value: SettingValue) => {
     setFailed(null);
@@ -89,6 +102,23 @@ export default function Ajustes() {
             </label>
           );
         })}
+      </div>
+
+      <h2>{t('ajustes.agentes')}</h2>
+      <p className="ajustes-intro">{t('ajustes.agentes.intro')}</p>
+      <div className="ajustes-lista">
+        <div className="ajustes-fila ajustes-guardia">
+          <div className="ajustes-fila-texto">
+            <span className="ajustes-fila-nombre">{t('ajustes.agentes.guardia')}</span>
+            <span className="ajustes-fila-hint">{t('ajustes.agentes.guardia.hint')}</span>
+          </div>
+          <Select
+            value={guardia}
+            onValueChange={(v) => { if (v !== guardia) write('agentes.guardia', { v: 1, text: v }); }}
+            ariaLabel={t('ajustes.agentes.guardia')}
+            options={opcionesGuardia}
+          />
+        </div>
       </div>
 
       <h2>{t('ajustes.modulos')}</h2>
