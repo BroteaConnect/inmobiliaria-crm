@@ -11,7 +11,8 @@ import {
   loadPlantillas, guardarPlantilla, sincronizarContent,
 } from './api';
 import {
-  EMPTY_PLANTILLA, esDirty, fieldsOf, payloadOf, validate, type PlantillaFields, type Problema,
+  EMPTY_PLANTILLA, congelados, contentAprobado, esDirty, fieldsOf, payloadOf, validate,
+  type PlantillaFields, type Problema,
 } from './plantilla-form';
 import './plantillas.css';
 
@@ -34,6 +35,16 @@ import './plantillas.css';
 // Searching, filtering and paging come from the `list` brick, like the
 // properties grid: thirty rows fit on one screen only until the agency writes
 // the thirty-first.
+//
+// One row is not editable at all in its text: a WhatsApp template Meta has
+// APPROVED. From then on Twilio sends the Content Meta holds, and the row's
+// `variables` array is the positional key that fills it — the chassis maps
+// values onto `{{1}} {{2}} {{3}}` in this array's order. An edit here would
+// not reach the client but WOULD move the values, putting the date where the
+// property should be on a message that has already left. Neither the approved
+// text nor the version it was approved at is readable from the CRM, so the
+// drift is not detected, it is prevented: the two bodies and the variable list
+// are read only while a Content is approved (plantilla-form.ts `congelados`).
 
 const TAMANO = 12;
 /** The columns that can be sorted, in the order they are read. */
@@ -154,6 +165,12 @@ export default function Plantillas() {
     // for an incomplete form: a dead button explains nothing.
     const problemas = validate(f);
     if (problemas.length) { setError(mensajeDe(problemas[0])); return; }
+    // The controls are read only above; this is the rule, and it holds whether
+    // or not a control was rendered.
+    if (aprobadaEnTwilio && congelados(f, fieldsOf(abierta)).length) {
+      setError(t('plantillas.errorCongelada'));
+      return;
+    }
     // Nothing changed: no PATCH, no version bump, no toast claiming a save.
     if (!esDirty(f, fieldsOf(abierta))) { cerrar(); return; }
     setGuardando(true);
@@ -215,8 +232,7 @@ export default function Plantillas() {
 
   // The text Twilio approved is the SAVED one. Once a body moves away from it,
   // the approval no longer covers what the agent is writing.
-  const aprobadaEnTwilio = !!abierta && abierta.canal === 'whatsapp'
-    && (abierta.content_estado === 'approved' || abierta.content_estado_en === 'approved');
+  const aprobadaEnTwilio = !!abierta && contentAprobado(abierta);
   const cambiadaDesdeTwilio = (idioma: 'es' | 'en') =>
     aprobadaEnTwilio && !!abierta && campos[`cuerpo_${idioma}`] !== (abierta[`cuerpo_${idioma}`] ?? '');
 
@@ -349,6 +365,12 @@ export default function Plantillas() {
         >
           <p className="pista plantilla-ayuda">{t('plantillas.editarAyuda', { n: String((abierta.version ?? 0) + 1) })}</p>
 
+          {/* Said once, above everything it applies to, in the same shape the
+              send dialog uses for "this is what will actually happen". */}
+          {aprobadaEnTwilio && (
+            <p className="plantilla-reparo plantilla-reparo-aviso" role="status">{t('plantillas.twilio.congelada')}</p>
+          )}
+
           <label className="campo">{t('plantillas.campo.nombre')}
             <input value={campos.nombre} required autoFocus onChange={(e) => setCampos({ ...campos, nombre: e.target.value })} />
           </label>
@@ -388,7 +410,10 @@ export default function Plantillas() {
                 </label>
               )}
               <label className="campo">{t('plantillas.campo.cuerpo')}
-                <textarea rows={8} value={campos.cuerpo_es} onChange={(e) => setCampos({ ...campos, cuerpo_es: e.target.value })} />
+                <textarea
+                  rows={8} value={campos.cuerpo_es} readOnly={aprobadaEnTwilio}
+                  onChange={(e) => setCampos({ ...campos, cuerpo_es: e.target.value })}
+                />
                 {cambiadaDesdeTwilio('es') && <span className="campo-ayuda">{t('plantillas.twilio.cambiada')}</span>}
               </label>
             </div>
@@ -400,34 +425,48 @@ export default function Plantillas() {
                 </label>
               )}
               <label className="campo">{t('plantillas.campo.cuerpo')}
-                <textarea rows={8} value={campos.cuerpo_en} onChange={(e) => setCampos({ ...campos, cuerpo_en: e.target.value })} />
+                <textarea
+                  rows={8} value={campos.cuerpo_en} readOnly={aprobadaEnTwilio}
+                  onChange={(e) => setCampos({ ...campos, cuerpo_en: e.target.value })}
+                />
                 {cambiadaDesdeTwilio('en') && <span className="campo-ayuda">{t('plantillas.twilio.cambiada')}</span>}
               </label>
             </div>
           </div>
 
           <div className="campo">
-            <label htmlFor="plantilla-variable">{t('plantillas.campo.variables')}</label>
+            {aprobadaEnTwilio
+              ? <span>{t('plantillas.campo.variables')}</span>
+              : <label htmlFor="plantilla-variable">{t('plantillas.campo.variables')}</label>}
             {campos.variables.length > 0 && (
               <ul className="variables-lista" aria-label={t('plantillas.campo.variables')}>
                 {campos.variables.map((v) => (
                   <li key={v} className="variable-token">
                     <code>{v}</code>
-                    <button type="button" className="variable-quitar" aria-label={t('plantillas.variableQuitar', { nombre: v })} onClick={() => quitarVariable(v)}>
-                      <IconClose size={14} />
-                    </button>
+                    {/* The order of this list is the positional key of the
+                        approved Content: while Meta holds one, nothing here
+                        adds, removes or reorders a name. */}
+                    {!aprobadaEnTwilio && (
+                      <button type="button" className="variable-quitar" aria-label={t('plantillas.variableQuitar', { nombre: v })} onClick={() => quitarVariable(v)}>
+                        <IconClose size={14} />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            <input
-              id="plantilla-variable" value={nuevaVariable} placeholder={t('plantillas.campo.variableNueva')}
-              autoCapitalize="off" autoCorrect="off" spellCheck={false}
-              onChange={(e) => setNuevaVariable(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); anadirVariable(); } }}
-              onBlur={anadirVariable}
-            />
-            <span className="campo-ayuda">{t('plantillas.campo.variablesAyuda', { ejemplo: '{{nombre}}' })}</span>
+            {!aprobadaEnTwilio && (
+              <input
+                id="plantilla-variable" value={nuevaVariable} placeholder={t('plantillas.campo.variableNueva')}
+                autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                onChange={(e) => setNuevaVariable(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); anadirVariable(); } }}
+                onBlur={anadirVariable}
+              />
+            )}
+            {!aprobadaEnTwilio && (
+              <span className="campo-ayuda">{t('plantillas.campo.variablesAyuda', { ejemplo: '{{nombre}}' })}</span>
+            )}
           </div>
 
           {abierta.canal === 'whatsapp' && (
