@@ -3,8 +3,12 @@ import { useI18n } from '../lib/LocaleContext';
 import {
   crearPropietario, crearPropiedad, crearLead, loadPropietarios, loadLeads, loadPropiedades,
 } from './api';
+import {
+  CAMPOS, adivina, clavesDuplicado, contextoDe, criteriosDe, propiedadDe, tituloDe,
+  type Accessor,
+} from './import-mapping';
 
-// Parser CSV/TSV mínimo y suficiente (comillas, separador tab, coma o punto y coma).
+// A CSV/TSV parser, minimal and sufficient (quotes; tab, comma or semicolon).
 function parseCsv(text: string): string[][] {
   const first = text.split('\n')[0];
   const sep = first.includes('\t') ? '\t' : first.includes(';') ? ';' : ',';
@@ -29,57 +33,8 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-// El destino de cada columna. La etiqueta que ve la agente sale del
-// diccionario (campo.<clave>); aquí solo vive el nombre del campo.
-const CAMPOS = [
-  '', 'p_nombre', 'p_telefono', 'p_email', 'p_pais', 'party_tipo',
-  'titulo', 'municipio', 'proyecto', 'edificio', 'unidad', 'direccion',
-  'precio', 'habitaciones', 'banos', 'superficie', 'descripcion',
-  't_fecha', 't_proc',
-] as const;
-
-// Autodetección de cabeceras: sinónimos en español + el esquema de registros
-// de transacciones (Transaction Date/Value, Master Project, BuildingNameEn,
-// UnitNumber, ProcedurePartyTypeNameEn, NameEn, Mobile, ProcedureNameEn…).
-// Para soportar otro Excel: añade aquí sus cabeceras.
-const adivina = (h: string): string => {
-  const s = h.toLowerCase().trim();
-  if (/transaction ?date|^fecha/.test(s)) return 't_fecha';
-  if (/transaction ?value|valor|precio|importe|amount/.test(s)) return 'precio';
-  if (/master ?project/.test(s)) return 'municipio';
-  if (/building/.test(s)) return 'edificio';
-  if (/unit ?(number|no)|^unidad/.test(s)) return 'unidad';
-  if (/party ?type|^rol/.test(s)) return 'party_tipo';
-  if (/procedure ?name|procedimiento/.test(s)) return 't_proc';
-  if (/country|país|pais|nacionalidad/.test(s)) return 'p_pais';
-  if (/mobile|m[óo]vil|tel[eé]fono|phone/.test(s)) return 'p_telefono';
-  if (/^project|proyecto/.test(s)) return 'proyecto';
-  if (/^name(en)?$|nombre|propietari|dueñ|cliente|vendedor/.test(s)) return 'p_nombre';
-  if (/t[ií]tulo|inmueble|vivienda/.test(s)) return 'titulo';
-  if (/municipio|ciudad|localidad|zona/.test(s)) return 'municipio';
-  if (/direc/.test(s)) return 'direccion';
-  if (/habitacion|dormitor|bedroom/.test(s)) return 'habitaciones';
-  if (/bañ|bathroom/.test(s)) return 'banos';
-  if (/superficie|metros|m2|m²|^size|sqft|area/.test(s)) return 'superficie';
-  if (/descrip|observa|notas/.test(s)) return 'descripcion';
-  if (/mail/.test(s)) return 'p_email';
-  return '';
-};
-
-// "1,250,000.50" → 1250000.5 (separador de miles fuera, decimal dentro)
-const numero = (v: string) => {
-  const limpio = v.replace(/[^\d.,-]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.');
-  const n = Number(limpio);
-  return Number.isFinite(n) && n !== 0 ? n : undefined;
-};
-
-// El registro de la clienta trae Size en pies cuadrados → guardamos m².
-const SQFT_A_M2 = 0.092903;
-const superficieM2 = (v: string) => {
-  const n = numero(v);
-  return n === undefined ? undefined : Math.round(n * SQFT_A_M2);
-};
-
+// The column heuristics, the junk rule and the row → record mapping live in
+// import-mapping.ts (pure, tested). This file is the screen and the loop.
 export default function Importar() {
   const { t } = useI18n();
   const [rows, setRows] = useState<string[][]>([]);
@@ -99,40 +54,37 @@ export default function Importar() {
       const propietarios = await loadPropietarios();
       const ownerId = new Map(propietarios.map((o) => [o.nombre.toLowerCase(), o.id]));
       const leadYaExiste = new Set((await loadLeads()).map((l) => l.nombre.toLowerCase()));
-      const propId = new Map((await loadPropiedades()).map((p) => [p.titulo.toLowerCase(), p.id]));
+      // Keyed by clavesDuplicado on BOTH sides: a property imported before the
+      // junk rule ("- · Burj Vista 1 · unidad 2205"), the same row imported
+      // after it ("Burj Vista 1 · unidad 2205") and the same row once the Area
+      // column supplies the zone ("Burj Khalifa · Burj Vista 1 · unidad 2205")
+      // are one property, not three — every title answers to its whole key
+      // and to its building · unit tail.
+      const propYaExiste = new Set((await loadPropiedades()).flatMap((p) => clavesDuplicado(p.titulo)));
 
       let nProps = 0, nOwners = 0, nLeads = 0, saltadas = 0;
       for (const row of rows.slice(1)) {
-        const val = (campo: string) => row[map.indexOf(campo)]?.trim() ?? '';
+        const val: Accessor = (campo) => row[map.indexOf(campo)]?.trim() ?? '';
         const rol = val('party_tipo').toLowerCase();
         const esComprador = /buyer|comprador/.test(rol);
         const nombre = val('p_nombre');
-        const contexto = [
-          val('t_proc') && `Procedimiento: ${val('t_proc')}`,
-          val('t_fecha') && `Fecha: ${val('t_fecha')}`,
-          val('p_pais') && `País: ${val('p_pais')}`,
-        ].filter(Boolean).join(' · ');
-
-        // título: explícito o compuesto proyecto + edificio + unidad
-        const titulo = val('titulo') ||
-          [val('proyecto') || val('municipio'), val('edificio'), val('unidad') && `unidad ${val('unidad')}`]
-            .filter(Boolean).join(' · ');
+        const contexto = contextoDe(val);
+        const titulo = tituloDe(val);
 
         if (esComprador) {
-          // Compradores del histórico → leads en cartera (matching futuro)
+          // Historical buyers → leads in the portfolio (future matching)
           if (!nombre || leadYaExiste.has(nombre.toLowerCase())) { saltadas++; continue; }
           await crearLead({
             nombre, telefono: val('p_telefono'), email: val('p_email') || undefined,
-            etapa: 'nutriendo', origen: 'histórico',
-            criterios: [titulo && `Compró en ${titulo}`, val('precio') && `~${val('precio')}`, contexto]
-              .filter(Boolean).join(' · '),
+            etapa: 'nutriendo', origen: 'histórico', // lang-sweep: allow
+            criterios: criteriosDe(val),
           });
           leadYaExiste.add(nombre.toLowerCase());
           nLeads++;
           continue;
         }
 
-        // Vendedores (o filas sin rol) → propietario + propiedad
+        // Sellers (or rows without a role) → owner + property
         let owner = '';
         if (nombre) {
           owner = ownerId.get(nombre.toLowerCase()) ?? '';
@@ -146,20 +98,10 @@ export default function Importar() {
             nOwners++;
           }
         }
-        if (!titulo || propId.has(titulo.toLowerCase())) { saltadas++; continue; }
-        const p = await crearPropiedad({
-          titulo,
-          municipio: val('municipio') || undefined,
-          direccion: val('direccion') || [val('edificio'), val('unidad')].filter(Boolean).join(', ') || undefined,
-          precio: numero(val('precio')),
-          habitaciones: numero(val('habitaciones')),
-          banos: numero(val('banos')),
-          superficie: superficieM2(val('superficie')),
-          descripcion: [val('descripcion'), contexto].filter(Boolean).join(' — ') || undefined,
-          estado: 'borrador',
-          propietario: owner || undefined,
-        });
-        propId.set(titulo.toLowerCase(), p.id);
+        const claves = clavesDuplicado(titulo);
+        if (!titulo || claves.some((k) => propYaExiste.has(k))) { saltadas++; continue; }
+        await crearPropiedad({ ...propiedadDe(val), propietario: owner || undefined });
+        for (const k of claves) propYaExiste.add(k);
         nProps++;
       }
       setLog(t('imp.ok', { owners: nOwners, props: nProps, leads: nLeads })
