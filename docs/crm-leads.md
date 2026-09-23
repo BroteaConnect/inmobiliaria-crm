@@ -3,8 +3,8 @@
 How the CRM's lead board (`src/crm/Kanban.tsx` + `src/crm/api.ts` +
 `src/crm/crm.css`) lists, filters and prioritizes `leads` records in the
 shared PocketBase. This page covers the board's states, the filter bar, the
-card anatomy, the three-level priority and the side panel with history and
-notes. The unattended rule is `desatendido()` in `api.ts`: a lead that is not
+card anatomy, the three-level priority and the side panel with assignee,
+visits, history and notes. The unattended rule is `desatendido()` in `api.ts`: a lead that is not
 `vendido` or `nutriendo` and has no contact in the last two days
 (`ultimo_contacto` empty or older than 48 h). Interface conventions shared by
 every screen (tokens, icons, hit areas, copy) are in
@@ -166,8 +166,41 @@ title (or `filtros.sinPropiedad`). The footer holds the contact actions:
 `nota`, stamps `leads.ultimo_contacto`, which is what `desatendido()` reads.
 
 The body shows the lead's message, the preferred time slot (`franja`), the
-priority group above, a quick-note input and the history:
+priority group above, the assignee, a quick-note input, the lead's visits and
+the history:
 
+- **Assigned to** (`.ficha-asignado`, since E4, 2026-09-23): a ui kit `Select`
+  over `loadUsuarios()` with a first option `lead.asignadoNadie` ("Nobody",
+  value `''`). Choosing an agent calls `asignarLead(id, userId)`; choosing
+  Nobody calls `asignarLead(id, null)`, which writes `asignado: ''`. The
+  board reloads on success; a failure (`lead.asignadoError`) is said inside
+  the panel (`error`, `role="alert"`) and as an error toast, and the stored
+  value is left as it was. A lead assigned to an id the directory does not
+  list (the `users` rule still closed on that instance, or a removed user)
+  shows as `lead.asignadoOtro` ("Another agent") rather than being silently
+  dropped to Nobody. A single value edited where it is read, like the
+  priority above it; the website's default (the agent on duty, see below) is
+  overridden here.
+
+```bash
+curl -X PATCH "$PB/api/collections/leads/records/$ID" \
+  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"asignado": ""}'   # unassign; send a users id to hand it over
+```
+
+- **Viewings** (`ul.ficha-visitas`, since E4): the lead's `visitas` rows,
+  most recent first (`loadVisitasDeLead(id)`, expanded `propiedad,agente`),
+  each as the Madrid date and time (`fechaHoraMadrid`, e.g. "23 Sept, 10:30"),
+  the property title (or `filtros.sinPropiedad`) and an outcome chip
+  (`.visita-estado-<resultado>`, `visitas.resultado.*`; an unset outcome
+  reads as `pendiente`). Empty shows `lead.sinVisitas`. The ghost button
+  `lead.programarVisita` ("Schedule a viewing") closes the record and opens
+  the visit dialog with this lead preselected; booked or cancelled, the
+  record reopens with its visits and history reloaded. The dialog and the
+  outcome control are documented in [docs/crm-visitas.md](crm-visitas.md).
+  Visits are loaded together with the history through the same stale-response
+  guard (`abiertoRef`); a failed visits load renders an empty list and never
+  blocks the history.
 - **History** (`ul.historial`): the lead's activities from `actividades`,
   **newest first, latest 50** (`loadActividades`). Each `<li>` shows the
   channel label, the relative time, the delivery state when present
@@ -212,6 +245,11 @@ grey the button out. It calls
 record with an empty history, then loads it. `origen: 'manual'` keeps phone
 and walk-in leads out of the "web" count in reports.
 
+Since E4 (2026-09-23) `crearLead()` defaults `asignado` to the signed-in
+user's id: a lead somebody types in belongs to that somebody. A caller that
+names an `asignado` keeps it, and a break-glass session (PocketBase token, no
+Brotea user) leaves the field unset rather than inventing an owner.
+
 - Enter in any field creates the lead: the fields are a real `<form>` and the
   footer's primary reaches it through `form="<id>"`.
 - While the create is in flight (`guardando`) the panel refuses to close:
@@ -243,7 +281,14 @@ curl -X PATCH "$PB/api/collections/leads/records/$ID" \
   -d '{"asignado": "'$USER_ID'", "canal_preferido": "whatsapp", "idioma": "en"}'
 ```
 
-The board does not render or edit these fields yet; `loadLeads()` still
-expands only `propiedad`. The full type reference, including the
-`Visita`, `Plantilla`, `Campana` and `Envio` types, is in
-[docs/crm-types.md](crm-types.md).
+Since E4 (2026-09-23) `asignado` is edited in the side panel ("Assigned to",
+above) and defaulted on creation: `crearLead()` sets it to the signed-in user
+and the chassis (`api.brotea.dev` `POST /requirements`, `source: lead_web`)
+sets it to the agent on duty, the `users` id stored in the `agentes.guardia`
+setting ("Agente de guardia" in Ajustes, `{ v: 1, text: <users id> }`; empty
+means nobody is on duty and a web lead arrives unassigned). `canal_preferido`
+and `idioma` are still not rendered or edited by the board, and `loadLeads()`
+still expands only `propiedad` (the panel's assignee Select reads the raw
+`asignado` id against `loadUsuarios()`, so no `asignado` expand is needed).
+The full type reference, including the `Visita`, `Plantilla`, `Campana` and
+`Envio` types, is in [docs/crm-types.md](crm-types.md).
